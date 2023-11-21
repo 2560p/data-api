@@ -1,0 +1,15 @@
+{
+    "name": "netflix-api",
+    "version": "0.0.1",
+    "description": "An API for Netflix",
+    "main": "app.js",
+    "scripts": {
+      "start": "bun app.js"
+    },
+    "dependencies": {
+      "express": "^4.18.2"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC"
+  }
