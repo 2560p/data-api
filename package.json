@@ -1,16 +1,21 @@
 {
-    "name": "netflix-api",
-    "version": "0.0.1",
-    "description": "An API for Netflix",
-    "main": "app.js",
-    "scripts": {
-      "start": "bun --watch app.js"
-    },
-    "dependencies": {
-      "express": "^4.18.2"
-    },
-    "prettier": {
-      "tabWidth": 4,
-      "useTabs": false
-    }
+  "name": "netflix-api",
+  "version": "0.0.1",
+  "description": "An API for Netflix",
+  "main": "app.js",
+  "scripts": {
+    "start": "bun --watch app.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "express": "^4.18.2",
+    "express-oas-generator": "^1.0.46",
+    "jsonwebtoken": "^9.0.2",
+    "postgres": "^3.4.3"
+  },
+  "prettier": {
+    "tabWidth": 4,
+    "useTabs": false,
+    "singleQuote": true
   }
+}
