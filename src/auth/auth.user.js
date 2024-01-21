@@ -1,5 +1,5 @@
 import { Router } from 'express';
-const { generateAccessToken, decodeAccessToken } = require('./jwt.js');
+const { generateAccessToken, decodeAccessToken } = require('../helpers/jwt.js');
 const bcryptjs = require('bcryptjs');
 
 const router = Router();

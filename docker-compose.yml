@@ -13,8 +13,8 @@ services:
             context: .
             dockerfile: Dockerfile
         volumes:
-            - ./app.js/:/app/app.js
-            - .env/:/app/.env
+            - ./app.js:/app/app.js
+            - .env:/app/.env
             - ./src:/app/src
         ports:
             - '8080:8080'
