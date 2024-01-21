@@ -4,7 +4,8 @@ import { sql } from '../helpers/db.handler';
 
 const router = Router();
 
-router.get('/', auth_middleware, async (req, res) => {
+// most viewed
+router.get('/mostViewed', auth_middleware, async (req, res) => {
     try {
         let { year, month } = req.query;
 
@@ -15,6 +16,27 @@ router.get('/', auth_middleware, async (req, res) => {
 
         let stats = await sql`
             SELECT * FROM public.get_sorted_movies_most_viewed(${year}, ${month})
+        `;
+        
+        res.status(200).json(stats);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+// least viewed
+router.get('/leastViewed', auth_middleware, async (req, res) => {
+    try {
+        let { year, month } = req.query;
+
+        if (!year || !month || isNaN(year) || isNaN(month)) {
+            res.status(400).json({ error: 'Invalid request parameters' });
+            return;
+        }
+
+        let stats = await sql`
+            SELECT * FROM public.get_sorted_movies_least_viewed(${year}, ${month})
         `;
         
         res.status(200).json(stats);
