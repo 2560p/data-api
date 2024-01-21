@@ -4,23 +4,7 @@ const bcryptjs = require('bcryptjs');
 
 const router = Router();
 
-// this is a special route.
-// it can't be accessed by normal users nor admins.
-// to use this one, read the README section on registering an admin.
 router.post('/register', async (req, res) => {
-    const authHeader = req.headers['authorization'];
-    const auth_token = authHeader && authHeader.split(' ')[1];
-
-    if (!auth_token) {
-        res.status(401).send('no auth token');
-        return;
-    }
-
-    if (auth_token !== process.env.admin_key) {
-        res.status(403).send('invalid auth token');
-        return;
-    }
-
     const { register_admin } = await import('../helpers/db.handler.js');
 
     let body = req.body;
@@ -28,6 +12,7 @@ router.post('/register', async (req, res) => {
         res.status(400).send('Invalid request');
         return;
     }
+
     let email = body.email;
     let password = body.password;
     let role = body.role;

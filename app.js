@@ -1,5 +1,6 @@
 import express from 'express';
 import { Router } from 'express';
+import cors from 'cors';
 
 import users from './src/users.js';
 import auth from './src/auth/auth.router.js';
@@ -25,6 +26,7 @@ env_check();
 const port = process.env.port;
 const app = express();
 app.use(express.json());
+app.use(cors());
 expressOasGenerator.handleResponses(app, {});
 
 const router = Router();
