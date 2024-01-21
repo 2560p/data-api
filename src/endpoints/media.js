@@ -40,20 +40,40 @@ router.get('/:id', auth_middleware, async (req, res) => {
     }
 });
 
+// add a new film
 router.post('/films', auth_middleware, async (req, res) => {
-    try {
-        const newFilm = req.body;
-        await sql`
+    try { 
+        let body = req.body;
+
+        if (!body || !body.title || !body.genre || !body.language || !body.description || !body.poster || !body.duration || !body.location || !body.rating || !body.age) {
+            res.status(400).send('Invalid request');
+            return;
+        }
+
+        let title = body.title;
+        let genre = body.genre;
+        let language = body.language;
+        let description = body.description;
+        let poster = body.poster;
+        let duration = body.duration;
+        let location = body.location;
+        let rating = body.rating;
+        let age = body.age;
+
+        let id = await sql`
         INSERT INTO media (title, genre, language, media_type, description, poster, duration, location, rating, age) 
         VALUES 
-        ('a', 'b', 'c', 'FILM', 'd', 'e', 5, 'f', 7, '12')`;
-        res.status(201).json({ message: 'Film inserted successfully', data: newFilm });
+        (${title}, ${genre}, ${language}, 'FILM', ${description}, ${poster}, ${duration}, ${location}, ${rating}, ${age})
+        returning id`;
+        id = id[0].id;
+        res.status(201).json({ message: 'Film inserted successfully', id: id });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
 });
 
+//insert series
 router.post('/series', auth_middleware, async (req, res) => {
     try {
         const newSeries = req.body;
