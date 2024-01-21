@@ -40,5 +40,32 @@ router.get('/:id', auth_middleware, async (req, res) => {
     }
 });
 
+router.post('/films', auth_middleware, async (req, res) => {
+    try {
+        const newFilm = req.body;
+        await sql`
+        INSERT INTO media (title, genre, language, media_type, description, poster, duration, location, rating, age) 
+        VALUES 
+        ('a', 'b', 'c', 'FILM', 'd', 'e', 5, 'f', 7, '12')`;
+        res.status(201).json({ message: 'Film inserted successfully', data: newFilm });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+router.post('/series', auth_middleware, async (req, res) => {
+    try {
+        const newSeries = req.body;
+        await sql`
+        INSERT INTO media (title, genre, language, media_type, description, poster, duration, location, rating, age) 
+        VALUES 
+        ('yes', 'maybe', 'possibly', 'SERIES', 'perhaps', 'no', 5, 'sure', 7, '12')`;
+        res.status(201).json({ message: 'Series inserted successfully', data: newSeries });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
 
 export default router;
