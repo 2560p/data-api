@@ -6,6 +6,7 @@ import auth from './src/auth/auth.router.js';
 import protected_route from './src/protected_route.js';
 import media from './src/endpoints/media.js';
 import profiles from './src/endpoints/profiles.js';
+import stats from './src/endpoints/stats.js';
 
 const { sql } = await import('./src/helpers/db.handler.js');
 import env_check from './src/helpers/env.js';
@@ -35,6 +36,7 @@ router.use('/users', users);
 router.use('/protected', protected_route);
 router.use('/media', media);
 router.use('/profiles', profiles);
+router.use('/stats', stats);
 
 app.use(router);
 
