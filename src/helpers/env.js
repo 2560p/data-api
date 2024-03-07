@@ -8,10 +8,10 @@ module.exports = function () {
         'db_username',
         'db_password',
         'db_dbname',
-        'admin_key',
     ];
 
     let is_valid = true;
+
     for (let i = 0; i < expected_envs.length; i++) {
         if (expected_envs[i] in process.env) {
             continue;
