@@ -66,10 +66,51 @@ async function retrieve_password_hash_admin(email) {
     return [true, status[0], status[1]];
 }
 
+// refresh token
+async function update_refresh_token(admin_id, token) {
+    // the expiration is in 3 days
+    let expiration = new Date();
+    expiration.setDate(expiration.getDate() + 3);
+
+    await sql`delete from refresh_tokens where admin_id = ${admin_id}`;
+    await sql`insert into refresh_tokens values (${admin_id}, ${token}, ${expiration})`;
+}
+
+async function retrieve_admin_by_refresh_token(token) {
+    let status = await sql`select * from refresh_tokens where token = ${token}`;
+
+    if (status.length == 0) {
+        return [false, null];
+    }
+
+    status = status[0];
+
+    // whenever the database updates the expiration date,
+    // it sets the date in UTC.
+    // so we need to adjust the current date to UTC.
+    var now = new Date();
+    var utc = new Date(now.getTime() + now.getTimezoneOffset() * 60000);
+
+    if (utc > status['expires_at']) {
+        await remove_refresh_token(status['admin_id']);
+        return [false, null];
+    }
+
+    return [true, status['admin_id']];
+}
+
+async function remove_refresh_token(admin_id) {
+    await sql`delete from refresh_tokens where admin_id = ${admin_id}`;
+}
+
+// exports
 export {
     sql,
     register_user,
     retrieve_password_hash_user,
     register_admin,
     retrieve_password_hash_admin,
+    update_refresh_token,
+    retrieve_admin_by_refresh_token,
+    remove_refresh_token,
 };

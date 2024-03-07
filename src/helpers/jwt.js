@@ -8,7 +8,7 @@ if (!jwt_secret) {
 }
 
 function generateAccessToken(data) {
-    let token = sign(data, jwt_secret, { expiresIn: 60 * 60 });
+    let token = sign(data, jwt_secret, { expiresIn: 60 * 30 });
     return token;
 }
 
