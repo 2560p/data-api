@@ -64,7 +64,9 @@ router.post('/login', async (req, res) => {
         return;
     }
 
-    const token = generateAccessToken({ user_id: Number(db_password[2]) });
+    let user_id = Number(db_password[2]);
+
+    const token = generateAccessToken({ user_id: user_id, role: 'user' });
     res.json({ token: token });
 });
 

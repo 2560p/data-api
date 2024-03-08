@@ -67,7 +67,7 @@ router.post('/login', async (req, res) => {
         return;
     }
 
-    const token = generateAccessToken({ admin_id: admin_id });
+    const token = generateAccessToken({ admin_id: admin_id, role: 'admin' });
 
     const refresh_token = crypto.randomBytes(16).toString('hex');
     await update_refresh_token(admin_id, refresh_token);

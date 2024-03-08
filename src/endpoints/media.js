@@ -1,22 +1,23 @@
 import { Router } from 'express';
-import auth_middleware from '../auth/auth.middleware';
+import { auth_middleware, require_admin } from '../auth/auth.middleware.js';
 import { sql } from '../helpers/db.handler';
+const respond = require('../helpers/response.js');
 
 const router = Router();
 
 router.get('/', auth_middleware, async (req, res) => {
     let media = await sql`select * from media`;
-    res.status(200).json(media);
+    respond(req, res, media);
 });
 
 router.get('/films', auth_middleware, async (req, res) => {
     let films = await sql`select * from media where media_type = 'FILM'`;
-    res.status(200).json(films);
+    respond(req, res, films);
 });
 
 router.get('/series', auth_middleware, async (req, res) => {
-    let films = await sql`select * from media where media_type = 'SERIES'`;
-    res.status(200).json(films);
+    let series = await sql`select * from media where media_type = 'SERIES'`;
+    respond(req, res, series);
 });
 
 router.get('/:id', auth_middleware, async (req, res) => {
@@ -25,14 +26,16 @@ router.get('/:id', auth_middleware, async (req, res) => {
 
         if (Number.isInteger(mediaId)) {
             let media = await sql`select * from media where id = ${mediaId}`;
-            
+
             if (media.length === 0) {
                 res.status(404).json({ error: 'Media not found' });
             } else {
                 res.status(200).json(media[0]);
             }
         } else {
-            res.status(400).json({ error: 'Invalid ID. Please provide a valid integer ID.' });
+            res.status(400).json({
+                error: 'Invalid ID. Please provide a valid integer ID.',
+            });
         }
     } catch (error) {
         console.error(error);
@@ -42,10 +45,21 @@ router.get('/:id', auth_middleware, async (req, res) => {
 
 // add a new film
 router.post('/films', auth_middleware, async (req, res) => {
-    try { 
+    try {
         let body = req.body;
 
-        if (!body || !body.title || !body.genre || !body.language || !body.description || !body.poster || !body.duration || !body.location || !body.rating || !body.age) {
+        if (
+            !body ||
+            !body.title ||
+            !body.genre ||
+            !body.language ||
+            !body.description ||
+            !body.poster ||
+            !body.duration ||
+            !body.location ||
+            !body.rating ||
+            !body.age
+        ) {
             res.status(400).send('Invalid request');
             return;
         }
@@ -81,7 +95,10 @@ router.post('/series', auth_middleware, async (req, res) => {
         INSERT INTO media (title, genre, language, media_type, description, poster, duration, location, rating, age) 
         VALUES 
         ('yes', 'maybe', 'possibly', 'SERIES', 'perhaps', 'no', 5, 'sure', 7, '12')`;
-        res.status(201).json({ message: 'Series inserted successfully', data: newSeries });
+        res.status(201).json({
+            message: 'Series inserted successfully',
+            data: newSeries,
+        });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Internal Server Error' });

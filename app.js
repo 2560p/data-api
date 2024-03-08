@@ -2,9 +2,7 @@ import express from 'express';
 import { Router } from 'express';
 import cors from 'cors';
 
-import users from './src/users.js';
 import auth from './src/auth/auth.router.js';
-import protected_route from './src/protected_route.js';
 import media from './src/endpoints/media.js';
 import profiles from './src/endpoints/profiles.js';
 import stats from './src/endpoints/stats.js';
@@ -34,8 +32,6 @@ const router = Router();
 
 router.use('/auth', auth);
 
-router.use('/users', users);
-router.use('/protected', protected_route);
 router.use('/media', media);
 router.use('/profiles', profiles);
 router.use('/stats', stats);

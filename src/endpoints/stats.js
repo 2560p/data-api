@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import auth_middleware from '../auth/auth.middleware';
+import { auth_middleware } from '../auth/auth.middleware';
 import { sql } from '../helpers/db.handler';
 
 const router = Router();
@@ -17,7 +17,7 @@ router.get('/mostViewed', auth_middleware, async (req, res) => {
         let stats = await sql`
             SELECT * FROM public.get_sorted_movies_most_viewed(${year}, ${month})
         `;
-        
+
         res.status(200).json(stats);
     } catch (error) {
         console.error(error);
@@ -38,7 +38,7 @@ router.get('/leastViewed', auth_middleware, async (req, res) => {
         let stats = await sql`
             SELECT * FROM public.get_sorted_movies_least_viewed(${year}, ${month})
         `;
-        
+
         res.status(200).json(stats);
     } catch (error) {
         console.error(error);
@@ -59,7 +59,7 @@ router.get('/mostLiked', auth_middleware, async (req, res) => {
         let stats = await sql`
             SELECT * FROM public.get_sorted_movies_most_liked(${year}, ${month})
         `;
-        
+
         res.status(200).json(stats);
     } catch (error) {
         console.error(error);
@@ -80,7 +80,7 @@ router.get('/leastLiked', auth_middleware, async (req, res) => {
         let stats = await sql`
             SELECT * FROM public.get_sorted_movies_least_liked(${year}, ${month})
         `;
-        
+
         res.status(200).json(stats);
     } catch (error) {
         console.error(error);
