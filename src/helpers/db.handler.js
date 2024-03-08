@@ -23,7 +23,7 @@ async function register_user(email, password) {
     let status = await sql`select public.user_register(${email}, ${password})`;
 
     status = parse_tuple(status[0]['user_register']);
-    if (Number(status[0]) == -1) {
+    if (Number(status[0]) === -1) {
         return [false, null];
     }
 
@@ -34,7 +34,7 @@ async function retrieve_password_hash_user(email) {
     let status = await sql`select public.user_retrieve_password_hash(${email})`;
 
     status = parse_tuple(status[0]['user_retrieve_password_hash']);
-    if (Number(status[0]) == -1) {
+    if (Number(status[0]) === -1) {
         return [false, null, null];
     }
 
@@ -47,7 +47,7 @@ async function register_admin(email, password, role) {
         await sql`select public.admin_register(${email}, ${password}, ${role}::public.role_type)`;
 
     status = parse_tuple(status[0]['admin_register']);
-    if (Number(status[0]) == -1) {
+    if (Number(status[0]) === -1) {
         return [false, null];
     }
 
@@ -59,7 +59,7 @@ async function retrieve_password_hash_admin(email) {
         await sql`select public.admin_retrieve_password_hash(${email})`;
 
     status = parse_tuple(status[0]['admin_retrieve_password_hash']);
-    if (Number(status[0]) == -1) {
+    if (Number(status[0]) === -1) {
         return [false, null, null];
     }
 
@@ -79,7 +79,7 @@ async function update_refresh_token(admin_id, token) {
 async function retrieve_admin_by_refresh_token(token) {
     let status = await sql`select * from refresh_tokens where token = ${token}`;
 
-    if (status.length == 0) {
+    if (status.length === 0) {
         return [false, null];
     }
 
@@ -88,8 +88,8 @@ async function retrieve_admin_by_refresh_token(token) {
     // whenever the database updates the expiration date,
     // it sets the date in UTC.
     // so we need to adjust the current date to UTC.
-    var now = new Date();
-    var utc = new Date(now.getTime() + now.getTimezoneOffset() * 60000);
+    let now = new Date();
+    let utc = new Date(now.getTime() + now.getTimezoneOffset() * 60000);
 
     if (utc > status['expires_at']) {
         await remove_refresh_token(status['admin_id']);
