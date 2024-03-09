@@ -34,7 +34,7 @@ export function require_admin(req, res, next) {
 
     let decoded = decodeAccessToken(token);
 
-    if (decoded.role !== 'admin') {
+    if (decoded !== null && decoded['role'] !== 'admin') {
         respond(req, res, { error: 'Forbidden' }, null, 403);
         return;
     }
