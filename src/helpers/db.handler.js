@@ -67,17 +67,18 @@ async function retrieve_password_hash_admin(email) {
 }
 
 // refresh token
-async function update_refresh_token(admin_id, token) {
+async function update_refresh_token(entity_id, token, type) {
     // the expiration is in 3 days
     let expiration = new Date();
     expiration.setDate(expiration.getDate() + 3);
 
-    await sql`delete from refresh_tokens where admin_id = ${admin_id}`;
-    await sql`insert into refresh_tokens values (${admin_id}, ${token}, ${expiration})`;
+    await sql`delete from refresh_tokens where entity_id = ${entity_id} and entity_type = ${type}`;
+    await sql`insert into refresh_tokens values (${entity_id}, ${type}, ${token}, ${expiration})`;
 }
 
-async function retrieve_admin_by_refresh_token(token) {
-    let status = await sql`select * from refresh_tokens where token = ${token}`;
+async function retrieve_entity_by_refresh_token(token, type) {
+    let status =
+        await sql`select * from refresh_tokens where token = ${token} and entity_type = ${type}`;
 
     if (status.length === 0) {
         return [false, null];
@@ -92,15 +93,15 @@ async function retrieve_admin_by_refresh_token(token) {
     let utc = new Date(now.getTime() + now.getTimezoneOffset() * 60000);
 
     if (utc > status['expires_at']) {
-        await remove_refresh_token(status['admin_id']);
+        await remove_refresh_token(status['entity_id'], type);
         return [false, null];
     }
 
-    return [true, status['admin_id']];
+    return [true, status['entity_id']];
 }
 
-async function remove_refresh_token(admin_id) {
-    await sql`delete from refresh_tokens where admin_id = ${admin_id}`;
+async function remove_refresh_token(entity_id, type) {
+    await sql`delete from refresh_tokens where entity_id = ${entity_id} and entity_type = ${type}`;
 }
 
 // exports
@@ -111,6 +112,6 @@ export {
     register_admin,
     retrieve_password_hash_admin,
     update_refresh_token,
-    retrieve_admin_by_refresh_token,
+    retrieve_entity_by_refresh_token,
     remove_refresh_token,
 };

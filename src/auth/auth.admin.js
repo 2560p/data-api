@@ -2,6 +2,7 @@ import { Router } from 'express';
 const { generateAccessToken } = require('../helpers/jwt.js');
 const bcryptjs = require('bcryptjs');
 const crypto = require('crypto');
+const respond = require('../helpers/response.js');
 
 const router = Router();
 
@@ -11,7 +12,7 @@ router.post('/register', async (req, res) => {
 
     let body = req.body;
     if (!body || !body.email || !body.password || !body.role) {
-        res.status(400).send('Invalid request');
+        respond(req, res, { error: 'Invalid request' }, null, 400);
         return;
     }
 
@@ -24,17 +25,17 @@ router.post('/register', async (req, res) => {
     let status = await register_admin(email, password, role);
 
     if (!status[0]) {
-        res.status(400).send('Admin already exists');
+        respond(req, res, { error: 'Email already exists' }, null, 400);
         return;
     }
 
     const admin_id = status[1];
-    const token = generateAccessToken({ admin_id: admin_id });
+    const token = generateAccessToken({ admin_id: admin_id, role: 'admin' });
 
     const refresh_token = crypto.randomBytes(16).toString('hex');
-    await update_refresh_token(admin_id, refresh_token);
+    await update_refresh_token(admin_id, refresh_token, 'ADMIN');
 
-    res.json({ token: token, refresh_token: refresh_token });
+    respond(req, res, { token: token, refresh_token: refresh_token }, 'auth');
 });
 
 router.post('/login', async (req, res) => {
@@ -45,7 +46,7 @@ router.post('/login', async (req, res) => {
 
     let body = req.body;
     if (!body || !body.email || !body.password) {
-        res.status(400).send('Invalid request');
+        respond(req, res, { error: 'Invalid request' }, null, 400);
         return;
     }
 
@@ -54,7 +55,7 @@ router.post('/login', async (req, res) => {
 
     let db_entry = await retrieve_password_hash_admin(email);
     if (!db_entry[0]) {
-        res.status(400).send('Invalid credentials');
+        respond(req, res, { error: 'Invalid credentials' }, null, 400);
         return;
     }
 
@@ -63,20 +64,20 @@ router.post('/login', async (req, res) => {
 
     let status = bcryptjs.compareSync(password, db_password);
     if (!status) {
-        res.status(400).send('Invalid credentials');
+        respond(req, res, { error: 'Invalid credentials' }, null, 400);
         return;
     }
 
     const token = generateAccessToken({ admin_id: admin_id, role: 'admin' });
 
     const refresh_token = crypto.randomBytes(16).toString('hex');
-    await update_refresh_token(admin_id, refresh_token);
+    await update_refresh_token(admin_id, refresh_token, 'ADMIN');
 
-    res.json({ token: token, refresh_token: refresh_token });
+    respond(req, res, { token: token, refresh_token: refresh_token }, 'auth');
 });
 
 router.post('/refresh', async (req, res) => {
-    const { retrieve_admin_by_refresh_token, update_refresh_token } =
+    const { retrieve_entity_by_refresh_token, update_refresh_token } =
         await import('../helpers/db.handler.js');
 
     let body = req.body;
@@ -86,7 +87,7 @@ router.post('/refresh', async (req, res) => {
     }
 
     let token = body.refresh_token;
-    let status = await retrieve_admin_by_refresh_token(token);
+    let status = await retrieve_entity_by_refresh_token(token, 'ADMIN');
 
     if (!status[0]) {
         res.status(401).send('Invalid token');
@@ -97,9 +98,14 @@ router.post('/refresh', async (req, res) => {
 
     let jwt_token = generateAccessToken({ admin_id: admin_id });
     let refresh_token = crypto.randomBytes(16).toString('hex');
-    await update_refresh_token(admin_id, refresh_token);
+    await update_refresh_token(admin_id, refresh_token, 'ADMIN');
 
-    res.json({ token: jwt_token, refresh_token: refresh_token });
+    respond(
+        req,
+        res,
+        { token: jwt_token, refresh_token: refresh_token },
+        'auth'
+    );
 });
 
 export default router;
