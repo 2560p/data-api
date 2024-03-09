@@ -60,13 +60,14 @@ router.post('/login', async (req, res) => {
     }
 
     let db_password = db_entry[1];
-    let admin_id = Number(db_entry[2]);
 
     let status = bcryptjs.compareSync(password, db_password);
     if (!status) {
         respond(req, res, { error: 'Invalid credentials' }, null, 400);
         return;
     }
+
+    let admin_id = Number(db_entry[2]);
 
     const token = generateAccessToken({ admin_id: admin_id, role: 'admin' });
 
@@ -82,7 +83,8 @@ router.post('/refresh', async (req, res) => {
 
     let body = req.body;
     if (!body || !body.refresh_token) {
-        res.status(400).send('Invalid request');
+        // res.status(400).send('Invalid request');
+        respond(req, res, { error: 'Invalid request' }, null, 400);
         return;
     }
 
@@ -90,13 +92,14 @@ router.post('/refresh', async (req, res) => {
     let status = await retrieve_entity_by_refresh_token(token, 'ADMIN');
 
     if (!status[0]) {
-        res.status(401).send('Invalid token');
+        // res.status(401).send('Invalid token');
+        respond(req, res, { error: 'Invalid token' }, null, 401);
         return;
     }
 
     let admin_id = status[1];
 
-    let jwt_token = generateAccessToken({ admin_id: admin_id });
+    let jwt_token = generateAccessToken({ admin_id: admin_id, role: 'admin' });
     let refresh_token = crypto.randomBytes(16).toString('hex');
     await update_refresh_token(admin_id, refresh_token, 'ADMIN');
 
