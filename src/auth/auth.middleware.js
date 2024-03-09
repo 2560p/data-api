@@ -1,16 +1,17 @@
 const { verifyAccessToken, decodeAccessToken } = require('../helpers/jwt.js');
+const respond = require('../helpers/response.js');
 
 export function auth_middleware(req, res, next) {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
 
     if (!token) {
-        res.status(401).send('Unauthorized');
+        respond(req, res, { error: 'Unauthorized' }, null, 401);
         return;
     }
 
     if (!verifyAccessToken(token)) {
-        res.status(403).send('invalid auth token');
+        respond(req, res, { error: 'Invalid auth token' }, null, 403);
         return;
     }
 
@@ -22,19 +23,19 @@ export function require_admin(req, res, next) {
     const token = authHeader && authHeader.split(' ')[1];
 
     if (!token) {
-        res.status(401).send('Unauthorized');
+        respond(req, res, { error: 'Unauthorized' }, null, 401);
         return;
     }
 
     if (!verifyAccessToken(token)) {
-        res.status(401).send('Unauthorized');
+        respond(req, res, { error: 'Unauthorized' }, null, 401);
         return;
     }
 
     let decoded = decodeAccessToken(token);
 
     if (decoded.role !== 'admin') {
-        res.status(403).send('Forbidden');
+        respond(req, res, { error: 'Forbidden' }, null, 403);
         return;
     }
 

@@ -83,7 +83,6 @@ router.post('/refresh', async (req, res) => {
 
     let body = req.body;
     if (!body || !body.refresh_token) {
-        // res.status(400).send('Invalid request');
         respond(req, res, { error: 'Invalid request' }, null, 400);
         return;
     }
@@ -92,7 +91,6 @@ router.post('/refresh', async (req, res) => {
     let status = await retrieve_entity_by_refresh_token(token, 'ADMIN');
 
     if (!status[0]) {
-        // res.status(401).send('Invalid token');
         respond(req, res, { error: 'Invalid token' }, null, 401);
         return;
     }
