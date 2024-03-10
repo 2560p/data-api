@@ -6,18 +6,6 @@ const respond = require('../helpers/response.js');
 
 const router = Router();
 
-// test code, TODO: remove
-router.get('/viewToken', (req, res) => {
-    let token = req.headers.authorization.split(' ')[1];
-
-    if (!token) {
-        res.status(400).send('Invalid request');
-        return;
-    }
-
-    res.json({ data: decodeAccessToken(token) });
-});
-
 router.post('/register', async (req, res) => {
     const { register_user } = await import('../helpers/db.handler.js');
     const { update_refresh_token } = await import('../helpers/db.handler.js');
