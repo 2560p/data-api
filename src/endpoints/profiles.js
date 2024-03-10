@@ -1,17 +1,17 @@
 import { Router } from 'express';
-import { auth_middleware } from '../auth/auth.middleware';
+import { auth_middleware, require_admin } from '../auth/auth.middleware';
 import { sql } from '../helpers/db.handler';
 const respond = require('../helpers/response.js');
 
 const router = Router();
 
 // get requests
-router.get('/', auth_middleware, async (req, res) => {
+router.get('/', auth_middleware, require_admin, async (req, res) => {
     let profiles = await sql`select * from profiles`;
     res.status(200).json(profiles);
 });
 
-router.get('/:id', auth_middleware, async (req, res) => {
+router.get('/:id', auth_middleware, require_admin, async (req, res) => {
     let id = parseInt(req.params.id);
 
     if (!Number.isInteger(id)) {
@@ -30,7 +30,7 @@ router.get('/:id', auth_middleware, async (req, res) => {
 });
 
 // post request
-router.post('/', auth_middleware, async (req, res) => {
+router.post('/', auth_middleware, require_admin, async (req, res) => {
     let body = req.body;
 
     if (
@@ -97,7 +97,7 @@ router.post('/', auth_middleware, async (req, res) => {
 });
 
 // put request
-router.put('/:id', auth_middleware, async (req, res) => {
+router.put('/:id', auth_middleware, require_admin, async (req, res) => {
     let id = parseInt(req.params.id);
     let body = req.body;
 
@@ -155,7 +155,7 @@ router.put('/:id', auth_middleware, async (req, res) => {
 });
 
 // delete request
-router.delete('/:id', auth_middleware, async (req, res) => {
+router.delete('/:id', auth_middleware, require_admin, async (req, res) => {
     let id = parseInt(req.params.id);
     if (!Number.isInteger(id)) {
         respond(req, res, { error: 'Invalid id' }, null, 400);
