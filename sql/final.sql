@@ -149,22 +149,28 @@ ALTER TYPE public.user_status OWNER TO postgres;
 CREATE FUNCTION public.admin_register(p_email character varying, p_password character varying, p_role public.role_type) RETURNS record
     LANGUAGE plpgsql
     AS $$
-DECLARE
+declare
     v_admin_exists BOOLEAN;
     admin_id integer;
     ret record;
-BEGIN
-    SELECT EXISTS (SELECT 1 FROM admins WHERE email = p_email) INTO v_admin_exists;
+begin
+    begin
+        select exists (select 1 from admins where email = p_email) into v_admin_exists;
 
-    IF v_admin_exists THEN
-        select -1, 0 into ret;
-    ELSE
-        INSERT INTO admins (email, password, role)
-        VALUES (p_email, p_password, p_role) returning id into admin_id;
-        select 1, admin_id into ret;
-    END IF;
+        if v_admin_exists then
+            select -1, 0 into ret;
+        else
+            insert into admins (email, password, role)
+            values (p_email, p_password, p_role) returning id into admin_id;
+            select 1, admin_id into ret;
+        end if;
+    exception
+        when others then
+            raise notice 'An exception occurred in admin_register function';
+            select -2, 0 into ret;
+    end;
     return ret;
-END;
+end;
 $$;
 
 
@@ -177,21 +183,27 @@ ALTER FUNCTION public.admin_register(p_email character varying, p_password chara
 CREATE FUNCTION public.admin_retrieve_password_hash(p_email character varying) RETURNS record
     LANGUAGE plpgsql
     AS $$
-DECLARE
+declare
     v_admin_exists BOOLEAN;
     ret record;
-BEGIN
-    SELECT EXISTS (SELECT 1 FROM admins WHERE email = p_email) INTO v_admin_exists;
+begin
+    begin
+        select EXISTS (select 1 from admins where email = p_email) into v_admin_exists;
 
-    IF v_admin_exists THEN
-        select password, id
-        from admins
-        where email = p_email into ret;
-    ELSE
-        select -1, 0 into ret;
-    END IF;
+        if v_admin_exists then
+            select password, id
+            from admins
+            where email = p_email into ret;
+        else
+            select -1, 0 into ret;
+        end if;
+    exception
+        when others then
+            raise notice 'An exception occurred in admin_retrieve_password_hash function';
+            select -2, 0 into ret;
+    end;
     return ret;
-END;
+end;
 $$;
 
 
@@ -227,227 +239,178 @@ ALTER FUNCTION public.check_id_role() OWNER TO postgres;
 CREATE FUNCTION public.check_profile_limit() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
-DECLARE
-    profile_count INT;
-BEGIN
-    SELECT COUNT(*) INTO profile_count
-    FROM profiles
-    WHERE user_id = NEW.user_id;
+declare
+    profile_count int;
+begin
+    select count(*) into profile_count
+    from profiles
+    where user_id = NEW.user_id;
 
-    IF profile_count >= 4 THEN
-        RAISE EXCEPTION 'Cannot exceed 4 profiles per user.';
-    END IF;
+    if profile_count >= 4 then
+        raise exception 'Cannot exceed 4 profiles per user.';
+    end if;
 
-    RETURN NEW;
-END;
+    return new;
+end;
 $$;
 
 
 ALTER FUNCTION public.check_profile_limit() OWNER TO postgres;
 
 --
--- Name: get_sorted_movies(integer, integer); Type: FUNCTION; Schema: public; Owner: postgres
+-- Name: get_sorted_movies(); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
-CREATE FUNCTION public.get_sorted_movies(desired_year integer, desired_month integer) RETURNS TABLE(name character varying)
+CREATE FUNCTION public.get_sorted_movies() RETURNS TABLE(name character varying)
     LANGUAGE plpgsql
     AS $$
-BEGIN
-    RETURN QUERY
+begin
+    return query
     (
-        SELECT
-            m.title AS name
-        FROM
+        select
+            m.title as name
+        from
             media m
-        LEFT JOIN (
-            SELECT
-                media_id,
-                date
-            FROM
-                watch_history
-            WHERE
-                EXTRACT(YEAR FROM date) = desired_year
-                AND EXTRACT(MONTH FROM date) = desired_month
-        ) wh ON m.id = wh.media_id
-        GROUP BY
-            m.id, m.title, m.likes
-        ORDER BY
-            COUNT(*) DESC
-        LIMIT 3
+            left join liked_media on m.id = liked_media.media_id
+        group by
+            m.id, m.title
+        order by
+            count(*) DESC
+        limit 3
     )
-    UNION ALL
+    union all
     (
-        SELECT
-            m.title AS name
-        FROM
+        select
+            m.title as name
+        from
             media m
-        LEFT JOIN (
-            SELECT
-                media_id,
-                date
-            FROM
-                watch_history
-            WHERE
-                EXTRACT(YEAR FROM date) = desired_year
-                AND EXTRACT(MONTH FROM date) = desired_month
-        ) wh ON m.id = wh.media_id
-        GROUP BY
-            m.id, m.title, m.likes
-        ORDER BY
-            m.likes DESC
-        LIMIT 3
+        left join liked_media on m.id = liked_media.media_id
+        group by
+            m.id, m.title
+        order by
+            count(*) desc
+        limit 3
     )
-    UNION ALL
+    union all
     (
-        SELECT
-            m.title AS name
-        FROM
+        select
+            m.title as name
+        from
             media m
-        LEFT JOIN (
-            SELECT
-                media_id,
-                date
-            FROM
-                watch_history
-            WHERE
-                EXTRACT(YEAR FROM date) = desired_year
-                AND EXTRACT(MONTH FROM date) = desired_month
-        ) wh ON m.id = wh.media_id
-        GROUP BY
-            m.id, m.title, m.likes
-        ORDER BY
-            COUNT(*) ASC
-        LIMIT 3
+        left join liked_media on m.id = liked_media.media_id
+        group by
+            m.id, m.title
+        order by
+            count(*)
+        limit 3
     )
-    UNION ALL
+    union all
     (
-        SELECT
-            m.title AS name
-        FROM
+        select
+            m.title as name
+        from
             media m
-        LEFT JOIN (
-            SELECT
-                media_id,
-                date
-            FROM
-                watch_history
-            WHERE
-                EXTRACT(YEAR FROM date) = desired_year
-                AND EXTRACT(MONTH FROM date) = desired_month
-        ) wh ON m.id = wh.media_id
-        GROUP BY
-            m.id, m.title, m.likes
-        ORDER BY
-            m.likes ASC
-        LIMIT 3
+        left join liked_media on m.id = liked_media.media_id
+        order by
+            count(*)
+        limit 3
     );
-END;
+exception
+    when others then
+        raise notice 'An exception occurred in get_sorted_movies function';
+        return;
+end;
 $$;
 
 
-ALTER FUNCTION public.get_sorted_movies(desired_year integer, desired_month integer) OWNER TO postgres;
+ALTER FUNCTION public.get_sorted_movies() OWNER TO postgres;
 
 --
--- Name: get_sorted_movies_least_liked(integer, integer); Type: FUNCTION; Schema: public; Owner: postgres
+-- Name: get_sorted_movies_least_liked(); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
-CREATE FUNCTION public.get_sorted_movies_least_liked(desired_year integer, desired_month integer) RETURNS TABLE(name character varying)
+CREATE FUNCTION public.get_sorted_movies_least_liked() RETURNS TABLE(name character varying)
     LANGUAGE plpgsql
     AS $$
-BEGIN
-    RETURN QUERY
-         SELECT
+begin
+    return query
+         select
             m.title AS name
-        FROM
+        from
             media m
-        LEFT JOIN (
-            SELECT
-                media_id,
-                date
-            FROM
-                watch_history
-            WHERE
-                EXTRACT(YEAR FROM date) = desired_year
-                AND EXTRACT(MONTH FROM date) = desired_month
-        ) wh ON m.id = wh.media_id
-        GROUP BY
-            m.id, m.title, m.likes
-        ORDER BY
-            m.likes
-        LIMIT 3;
-END;
+        left join liked_media on m.id = liked_media.media_id
+        group by
+            m.id, m.title
+        order by
+            count(*)
+        limit 3;
+exception
+    when others then
+        raise notice 'An exception occurred in get_sorted_movies_least_liked function';
+        return;
+end;
 $$;
 
 
-ALTER FUNCTION public.get_sorted_movies_least_liked(desired_year integer, desired_month integer) OWNER TO postgres;
+ALTER FUNCTION public.get_sorted_movies_least_liked() OWNER TO postgres;
 
 --
--- Name: get_sorted_movies_least_viewed(integer, integer); Type: FUNCTION; Schema: public; Owner: postgres
+-- Name: get_sorted_movies_least_viewed(); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
-CREATE FUNCTION public.get_sorted_movies_least_viewed(desired_year integer, desired_month integer) RETURNS TABLE(name character varying)
+CREATE FUNCTION public.get_sorted_movies_least_viewed() RETURNS TABLE(name character varying)
     LANGUAGE plpgsql
     AS $$
-BEGIN
-    RETURN QUERY
-        SELECT
-            m.title AS name
-        FROM
+begin
+    return query
+        select
+            m.title as name
+        from
             media m
-        LEFT JOIN (
-            SELECT
-                media_id,
-                date
-            FROM
-                watch_history
-            WHERE
-                EXTRACT(YEAR FROM date) = desired_year
-                AND EXTRACT(MONTH FROM date) = desired_month
-        ) wh ON m.id = wh.media_id
-        GROUP BY
-            m.id, m.title, m.likes
-        ORDER BY
-            COUNT(*) ASC
-        LIMIT 3;
-END;
+        left join liked_media on m.id = liked_media.media_id
+        group by
+            m.id, m.title
+        order by
+            count(*)
+        limit 3;
+exception
+when others then
+    raise notice 'An exception occurred in get_sorted_movies_least_viewed function';
+    return;
+end;
 $$;
 
 
-ALTER FUNCTION public.get_sorted_movies_least_viewed(desired_year integer, desired_month integer) OWNER TO postgres;
+ALTER FUNCTION public.get_sorted_movies_least_viewed() OWNER TO postgres;
 
 --
--- Name: get_sorted_movies_most_liked(integer, integer); Type: FUNCTION; Schema: public; Owner: postgres
+-- Name: get_sorted_movies_most_liked(); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
-CREATE FUNCTION public.get_sorted_movies_most_liked(desired_year integer, desired_month integer) RETURNS TABLE(name character varying)
+CREATE FUNCTION public.get_sorted_movies_most_liked() RETURNS TABLE(name character varying)
     LANGUAGE plpgsql
     AS $$
-BEGIN
-    RETURN QUERY
-        SELECT
-            m.title AS name
-        FROM
+begin
+    return query
+        select
+            m.title as name
+        from
             media m
-        LEFT JOIN (
-            SELECT
-                media_id,
-                date
-            FROM
-                watch_history
-            WHERE
-                EXTRACT(YEAR FROM date) = desired_year
-                AND EXTRACT(MONTH FROM date) = desired_month
-        ) wh ON m.id = wh.media_id
-        GROUP BY
-            m.id, m.title, m.likes
-        ORDER BY
-            m.likes DESC
-        LIMIT 3;
-END;
+        left join liked_media on m.id = liked_media.media_id
+        group by
+            m.id, m.title
+        order by
+            count(*) desc
+        limit 3;
+exception
+    when others then
+        raise notice 'An exception occurred in get_sorted_movies_most_liked function';
+        return;
+end;
 $$;
 
 
-ALTER FUNCTION public.get_sorted_movies_most_liked(desired_year integer, desired_month integer) OWNER TO postgres;
+ALTER FUNCTION public.get_sorted_movies_most_liked() OWNER TO postgres;
 
 --
 -- Name: get_sorted_movies_most_viewed(integer, integer); Type: FUNCTION; Schema: public; Owner: postgres
@@ -456,28 +419,31 @@ ALTER FUNCTION public.get_sorted_movies_most_liked(desired_year integer, desired
 CREATE FUNCTION public.get_sorted_movies_most_viewed(desired_year integer, desired_month integer) RETURNS TABLE(name character varying)
     LANGUAGE plpgsql
     AS $$
-BEGIN
-    RETURN QUERY
-    SELECT
+begin
+    return query
+    select
         m.title
-    FROM
+    from
         media m
-    LEFT JOIN (
-        SELECT
-            media_id,
-            date
-        FROM
+    left join (
+        select
+            media_id
+        from
             watch_history
-        WHERE
-            EXTRACT(YEAR FROM date) = desired_year
-            AND EXTRACT(MONTH FROM date) = desired_month
-    ) wh ON m.id = wh.media_id
-    GROUP BY
-        m.id, m.title, m.likes
-    ORDER BY
-        COUNT(*) DESC
-    LIMIT 3;
-END;
+        where
+            extract(year from date) = desired_year
+            and extract(month from date) = desired_month
+    ) wh on m.id = wh.media_id
+    group by
+        m.id, m.title
+    order by
+        count(*) desc
+    limit 3;
+exception
+    when others then
+        raise notice 'An exception occurred in get_sorted_movies_most_viewed function';
+        return;
+end;
 $$;
 
 
@@ -490,15 +456,21 @@ ALTER FUNCTION public.get_sorted_movies_most_viewed(desired_year integer, desire
 CREATE FUNCTION public.get_watch_count_per_person(p_profileid integer, p_mediaid integer) RETURNS integer
     LANGUAGE plpgsql
     AS $$
-DECLARE
-    v_WatchCount INT;
-BEGIN
-    SELECT COUNT(*) INTO v_WatchCount
-    FROM watch_history
-    WHERE profile_id = p_ProfileID AND media_id = p_MediaID;
+declare
+    v_WatchCount int;
+begin
+    begin
+        select count(*) into v_WatchCount
+        from watch_history
+        where profile_id = p_ProfileID and media_id = p_MediaID;
 
-    RETURN v_WatchCount;
-END;
+        return v_WatchCount;
+    exception
+    when others then
+        raise notice 'An exception occurred in get_watch_count_per_person function';
+        return -1;
+    end;
+end;
 $$;
 
 
@@ -540,23 +512,29 @@ ALTER PROCEDURE public.invite_user_discount(IN p_inviter_id integer, IN p_invite
 CREATE FUNCTION public.most_viewed_movies() RETURNS TABLE(media_id integer, view_count integer)
     LANGUAGE plpgsql
     AS $$
-BEGIN
-    RETURN QUERY
-    SELECT
-        m.id,
-        COUNT(*)::INT AS view_count
-    FROM
-        watch_history wh
-    JOIN
-        media m ON wh.media_id = m.id
-    WHERE
-        m.media_type = 'FILM'
-    GROUP BY
-        m.id
-    ORDER BY
-        view_count DESC
-    LIMIT 3;
-END;
+begin
+    begin
+        return query
+        select
+            m.id,
+            COUNT(*)::int as view_count
+        from
+            watch_history wh
+        join
+            media m on wh.media_id = m.id
+        where
+            m.type = 'FILM'
+        group by
+            m.id
+        order by
+            view_count desc
+        limit 3;
+    exception
+        when others then
+            raise notice 'An exception occurred in most_viewed_movies function';
+            return;
+    end;
+end;
 $$;
 
 
@@ -566,33 +544,39 @@ ALTER FUNCTION public.most_viewed_movies() OWNER TO postgres;
 -- Name: toggle_media_like(integer, integer); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
-CREATE FUNCTION public.toggle_media_like(p_userid integer, p_mediaid integer) RETURNS void
+CREATE FUNCTION public.toggle_media_like(p_profileid integer, p_mediaid integer) RETURNS void
     LANGUAGE plpgsql
     AS $$
-DECLARE
+declare
     v_AlreadyLiked BOOLEAN;
-BEGIN
-    SELECT EXISTS (
-        SELECT 1 FROM liked_media
-        WHERE user_id = p_UserID AND media_id = p_MediaID
-    ) INTO v_AlreadyLiked;
-
-    IF v_AlreadyLiked THEN
-        DELETE FROM liked_media
-        WHERE user_id = p_UserID AND media_id = p_MediaID;
-
-        RAISE NOTICE 'Like removed for MediaID: %', p_MediaID;
-    ELSE
-        INSERT INTO liked_media (user_id, media_id)
-        VALUES (p_UserID, p_MediaID);
-
-        RAISE NOTICE 'Like added for MediaID: %', p_MediaID;
-    END IF;
-END;
+begin
+    begin
+        select exists (
+            select 1 from liked_media
+            where profile_id = p_ProfileID and media_id = p_MediaID
+        ) into v_AlreadyLiked;
+    
+        if v_AlreadyLiked then
+            delete from liked_media
+            where profile_id = p_ProfileID and media_id = p_MediaID;
+    
+            raise notice 'Like removed for MediaID: %', p_MediaID;
+        else
+            insert into liked_media (profile_id, media_id)
+            values (p_ProfileID, p_MediaID);
+    
+            raise notice 'Like added for MediaID: %', p_MediaID;
+        end if;
+    exception
+    when others then
+        raise notice 'An exception occurred in toggle_media_like function';
+        return;
+    end;
+end;
 $$;
 
 
-ALTER FUNCTION public.toggle_media_like(p_userid integer, p_mediaid integer) OWNER TO postgres;
+ALTER FUNCTION public.toggle_media_like(p_profileid integer, p_mediaid integer) OWNER TO postgres;
 
 --
 -- Name: update_cost_trigger_function(); Type: FUNCTION; Schema: public; Owner: postgres
@@ -601,14 +585,20 @@ ALTER FUNCTION public.toggle_media_like(p_userid integer, p_mediaid integer) OWN
 CREATE FUNCTION public.update_cost_trigger_function() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
-BEGIN
-    IF (NEW.has_invited IS NOT NULL AND OLD.has_invited IS NULL) OR
-       (NEW.invited_by IS NOT NULL AND OLD.invited_by IS NULL) THEN
-        NEW.cost_per_month := NEW.cost_per_month - 2;
-    END IF;
-
-    RETURN NEW;
-END;
+begin
+    begin
+        if (NEW.has_invited is not null and OLD.has_invited is null) or
+           (NEW.invited_by is not null and OLD.invited_by is null) then
+            NEW.cost_per_month := NEW.cost_per_month - 2;
+        end if;
+    
+        return new;
+    exception
+        when others then
+            raise notice 'An exception occurred in update_cost_trigger_function';
+            return null;
+    end;
+end;
 $$;
 
 
@@ -653,22 +643,28 @@ ALTER PROCEDURE public.update_currently_watched(IN p_profileid integer, IN p_med
 CREATE FUNCTION public.user_register(p_email character varying, p_password character varying) RETURNS record
     LANGUAGE plpgsql
     AS $$
-DECLARE
+declare
     v_user_exists BOOLEAN;
     user_id integer;
     ret record;
-BEGIN
-    SELECT EXISTS (SELECT 1 FROM users WHERE email = p_email) INTO v_user_exists;
-
-    IF v_user_exists THEN
-        select -1, 0 into ret;
-    ELSE
-        INSERT INTO users (email, password)
-        VALUES (p_email, p_password) returning id into user_id;
-        select 1, user_id into ret;
-    END IF;
+begin
+    begin
+        select EXISTS (select 1 from users where email = p_email) into v_user_exists;
+    
+        if v_user_exists then
+            select -1, 0 into ret;
+        else
+            insert into users (email, password)
+            values (p_email, p_password) returning id into user_id;
+            select 1, user_id into ret;
+        end if;
+    exception
+        when others then
+            raise notice 'An exception occurred in user_register function';
+            select -2, 0 into ret;
+    end;
     return ret;
-END;
+end;
 $$;
 
 
@@ -681,21 +677,27 @@ ALTER FUNCTION public.user_register(p_email character varying, p_password charac
 CREATE FUNCTION public.user_retrieve_password_hash(p_email character varying) RETURNS record
     LANGUAGE plpgsql
     AS $$
-DECLARE
+declare
     v_user_exists BOOLEAN;
     ret record;
-BEGIN
-    SELECT EXISTS (SELECT 1 FROM users WHERE email = p_email) INTO v_user_exists;
+begin
+    begin
+        select exists (select 1 from users where email = p_email) into v_user_exists;
 
-    IF v_user_exists THEN
-        select password, id
-        from users
-        where email = p_email into ret;
-    ELSE
-        select -1, 0 into ret;
-    END IF;
+        if v_user_exists then
+            select password, id
+            from users
+            where email = p_email into ret;
+        else
+            select -1, 0 into ret;
+        end if;
+    exception
+        when others then
+            raise notice 'An exception occurred in user_retrieve_password_hash function';
+            SELECT -2, 0 INTO ret;
+    end;
     return ret;
-END;
+end;
 $$;
 
 
