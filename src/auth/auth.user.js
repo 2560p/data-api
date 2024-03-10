@@ -28,6 +28,28 @@ router.post('/register', async (req, res) => {
         return;
     }
 
+    // validate email
+    let email_regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email_regex.test(body.email)) {
+        respond(req, res, { error: 'Invalid email' }, null, 400);
+        return;
+    }
+
+    // validate password
+    let password_regex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d]{8,}$/;
+    if (!password_regex.test(body.password)) {
+        respond(
+            req,
+            res,
+            {
+                error: 'Password must contain at least 1 capital letter, 1 small letter, 1 number, and at least 8 characters long',
+            },
+            null,
+            400
+        );
+        return;
+    }
+
     let email = body.email;
     let password = body.password;
     password = bcryptjs.hashSync(password, 10);
@@ -35,7 +57,7 @@ router.post('/register', async (req, res) => {
     let status = await register_user(email, password);
 
     if (!status[0]) {
-        respond(req, res, { error: 'Email already exists' }, null, 400);
+        respond(req, res, { error: 'Email already exists' }, null, 409);
         return;
     }
 
@@ -63,18 +85,19 @@ router.post('/login', async (req, res) => {
         respond(req, res, { error: 'Invalid request' }, null, 400);
         return;
     }
+
     let email = body.email;
     let db_password = await retrieve_password_hash_user(email);
 
     if (!db_password[0]) {
-        respond(req, res, { error: 'Invalid credentials' }, null, 400);
+        respond(req, res, { error: 'Invalid credentials' }, null, 401);
         return;
     }
 
     let status = bcryptjs.compareSync(body.password, db_password[1]);
 
     if (!status) {
-        respond(req, res, { error: 'Invalid credentials' }, null, 400);
+        respond(req, res, { error: 'Invalid credentials' }, null, 401);
         return;
     }
 
