@@ -2,66 +2,74 @@
 
 This repository contains the source code for netflix-api.
 
-Please note: the repository's structure (with the contents) and
+## Installation and running
 
-## Requests specifications
+-   To run the project, clone the repository first.
+-   As it is cloned, create `.env` (make sure it follows the same structure as `.env.dist`).
+-   Make sure you have Docker installed. Run `docker-compose up --build` to build the project initially.
+-   The docker script will create a database structure and fill the database with basic data.
+-   To run the project after the initial installation, use `docker-compose up`.
 
-| Endpoint    | Request Type | Body / Query parameters                | Response                                |
-| ----------- | ------------ | -------------------------------------- | --------------------------------------- |
-| /register   | POST         | `{ "email": "...", "password":"..." }` | `{ "success": true, "message": "..." }` |
-| /login      | POST         | `{ "email": "...", "password":"..." }` | `{ "success": true, "token": "..." }`   |
-| /movies     | GET          |                                        | `[object movie, object movie...]`       |
-| /movies/:id | GET          | :id                                    | `{object movie}`                        |
+## Backup and Restore
 
+In order to successfully create a backup of the database, you would have to have Postgres command line tools installed and accessible through the command line (in the _PATH_) of any choice.
 
-# Stored Procedures & Triggers
-<h2>admin_register:</h2>
-<li> Worked on by Paul Demenko
+Here is a bit of information on the tools we propose to use for the backups.
 
-<h2>admin_retrieve_password_hash:</h2>
-<li> Worked on by Paul Demenko
+### `pg_dump`
 
-<h2>apply_discount:</h2>
-<li> Worked on by Marijn Veenstra & Anastasia Lukanova
+`pg_dump` extracts a Postgres database into a script file.
 
-<h2>check_profile_limit:</h2>
-<li> Worked on by Gabriel Guevara
+#### Configurable options:
 
-<h2>get_sorted_movies:</h2>
-<li> Worked on by Gabriel Guevara & Marijn Veenstra
+-   `-h host`
 
-<h2>get_sorted_movies_least_liked:</h2>
-<li> Worked on by Gabriel Guevara & Marijn Veenstra
+Specifies the hostname of the machine on which the database is running.
 
-<h2>get_sorted_movies_least_viewed:</h2>
-<li> Worked on by Gabriel Guevara & Marijn Veenstra
+-   `-p port`
 
-<h2>get_sorted_movies_most_liked:</h2>
-<li> Worked on by Gabriel Guevara & Marijn Veenstra
+Specifies the port the database is listening for connections on. The port number defaults to 5432, or the value of the PGPORT environment variable (if set).
 
-<h2>get_sorted_movies_most_viewed:</h2>
-<li> Worked on by Gabriel Guevara & Marijn Veenstra
+-   `-f file_name`
 
-<h2>get_watch_count_per_person:</h2>
-<li> Worked on by Gabriel Guevara
+The name of (the path to) the backup file. Can contain directories (for example, `backups/2024-01-01.dump`) or be a full path (`C:\backups\2024-01-01.dump`). **The directories should be created before executing the commands.**
 
-<h2>invite_user_discount:</h2>
-<li> Worked on by Marijn Veenstra & Anastasia Lukanova
+### `pg_restore`
 
-<h2>most_viewed_movies:</h2>
-<li> Worked on by Gabriel Guevara & Marijn Veenstra
+`pg_restore` is a utility for restoring a Postgres database from an archive created by `pg_dump`.
 
-<h2>toggle_media_like:</h2>
-<li> Worked on by Gabriel Guevara
+#### Configurable options:
 
-<h2>update_cost_trigger_function:</h2>
-<li> Worked on by Marijn Veenstra & Anastasia Lukanova
+-   `-h hostname`
 
-<h2>update_currently_watched:</h2>
-<li> Worked on by Gabriel Guevara & Marijn Veenstra
+Specifies the host name of the machine on which the server is running. If the value begins with a slash, it is used as the directory for the Unix-domain socket.
 
-<h2>user_login:</h2>
-<li> Worked on by Gabriel Guevara
+-   `-p port`
 
-<h2>user_register:</h2>
-<li> Worked on by Gabriel Guevara
+Specifies the port the database is listening for connections on. The port number defaults to 5432, or the value of the PGPORT environment variable (if set).
+
+### Create backup
+
+Both commands will require you to enter the password for _postgres_ user. It is set in the `.env`. Here is an example of how to create a backup and then restore it.
+
+_Please note, this will create a backup in the directory named 'backups' (it has to be created first). You can always apply configurable options of your choice._
+
+```
+pg_dump netflix_api -h localhost -U postgres --clean -F c -f backups/2024-01-01.dump
+```
+
+### Restore from backup
+
+To restore the database from an existing backup file, run the following command:
+
+```
+pg_restore backups/2024-01-01.dump -d netflix_api --disable-triggers --clean --single-transaction -h localhost -U postgres
+```
+
+### Advice
+
+The group advises to create backups every day and keep the old backups for 1 month.
+
+## Testing
+
+Testing has been incorporated in Postman requests. You can find the collection under `docs/`.

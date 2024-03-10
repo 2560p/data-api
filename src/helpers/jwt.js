@@ -1,14 +1,12 @@
 const sign = require('jsonwebtoken').sign;
 const verify = require('jsonwebtoken').verify;
 
+// we can safely assign a variable here because
+// .env is checked in the helpers/env.js
 const jwt_secret = process.env.jwt_secret;
-if (!jwt_secret) {
-    console.error('FATAL ERROR: jwt_secret is not found in .env file.');
-    process.exit(1);
-}
 
 function generateAccessToken(data) {
-    let token = sign(data, jwt_secret, { expiresIn: 60 * 60 });
+    let token = sign(data, jwt_secret, { expiresIn: 60 * 30 });
     return token;
 }
 
@@ -24,7 +22,7 @@ function verifyAccessToken(token) {
 }
 
 function decodeAccessToken(token) {
-    let decoded = 'no_info';
+    let decoded = null;
     verify(token, jwt_secret, (err, decodedToken) => {
         if (!err) {
             decoded = decodedToken;

@@ -1,0 +1,385 @@
+openapi: 3.0.0
+info:
+    title: netflix-api
+    version: 0.0.1
+    description: 'Netflix API specifications'
+paths:
+    /auth/user/register:
+        post:
+            summary: Register a new user
+            tags: ['User auth']
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            properties:
+                                email:
+                                    type: string
+                                    format: email
+                                password:
+                                    type: string
+                            required:
+                                - email
+                                - password
+            responses:
+                '200':
+                    description: Registration successful
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Auth'
+                        application/xml:
+                            schema:
+                                $ref: '#/components/schemas/Auth'
+                '400':
+                    description: Invalid request or Email already exists
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    error:
+                                        type: string
+                        application/xml:
+                            schema:
+                                type: string
+                                xml:
+                                    name: error
+    /auth/user/login:
+        post:
+            summary: Login for user
+            tags: ['User auth']
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            properties:
+                                email:
+                                    type: string
+                                    format: email
+                                password:
+                                    type: string
+                            required:
+                                - email
+                                - password
+            responses:
+                '200':
+                    description: Login successful
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Auth'
+                        application/xml:
+                            schema:
+                                $ref: '#/components/schemas/Auth'
+                '400':
+                    description: Invalid request or Invalid credentials
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    error:
+                                        type: string
+                        application/xml:
+                            schema:
+                                type: string
+                                xml:
+                                    name: error
+    /auth/user/refresh:
+        post:
+            summary: Refresh user tokens
+            tags: ['User auth']
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            properties:
+                                refresh_token:
+                                    type: string
+                            required:
+                                - refresh_token
+            responses:
+                '200':
+                    description: Tokens refreshed successfully
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Auth'
+                        application/xml:
+                            schema:
+                                $ref: '#/components/schemas/Auth'
+                '400':
+                    description: Invalid request
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    error:
+                                        type: string
+                        application/xml:
+                            schema:
+                                type: string
+                                xml:
+                                    name: error
+                '401':
+                    description: Invalid token
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    error:
+                                        type: string
+                        application/xml:
+                            schema:
+                                type: string
+                                xml:
+                                    name: error
+    /auth/admin/register:
+        post:
+            summary: Register a new admin
+            tags: ['Admin auth']
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            properties:
+                                email:
+                                    type: string
+                                    format: email
+                                password:
+                                    type: string
+                                role:
+                                    type: string
+                                    enum: ['junior', 'medior', 'senior']
+                            required:
+                                - email
+                                - password
+                                - role
+            responses:
+                '200':
+                    description: Registration successful
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Auth'
+                        application/xml:
+                            schema:
+                                $ref: '#/components/schemas/Auth'
+                '400':
+                    description: Invalid request or Email already exists
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    error:
+                                        type: string
+                        application/xml:
+                            schema:
+                                type: string
+                                xml:
+                                    name: error
+    /auth/admin/login:
+        post:
+            summary: Login for admin
+            tags: ['Admin auth']
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            properties:
+                                email:
+                                    type: string
+                                    format: email
+                                password:
+                                    type: string
+                            required:
+                                - email
+                                - password
+            responses:
+                '200':
+                    description: Login successful
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Auth'
+                        application/xml:
+                            schema:
+                                $ref: '#/components/schemas/Auth'
+                '400':
+                    description: Invalid request or Invalid credentials
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    error:
+                                        type: string
+                        application/xml:
+                            schema:
+                                type: string
+                                xml:
+                                    name: error
+    /auth/admin/refresh:
+        post:
+            summary: Refresh admin tokens
+            tags: ['Admin auth']
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            properties:
+                                refresh_token:
+                                    type: string
+                            required:
+                                - refresh_token
+            responses:
+                '200':
+                    description: Tokens refreshed successfully
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Auth'
+                        application/xml:
+                            schema:
+                                $ref: '#/components/schemas/Auth'
+                '400':
+                    description: Invalid request
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    error:
+                                        type: string
+                        application/xml:
+                            schema:
+                                type: string
+                                xml:
+                                    name: error
+                '401':
+                    description: Invalid token
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    error:
+                                        type: string
+                        application/xml:
+                            schema:
+                                type: string
+                                xml:
+                                    name: error
+    /media:
+        get:
+            summary: Fetch all media
+            tags:
+                - Media
+            security:
+                - bearer_auth: []
+            responses:
+                '200':
+                    description: A list of media
+                    content:
+                        application/json:
+                            schema:
+                                type: array
+                                items:
+                                    $ref: '#/components/schemas/Media'
+                        application/xml:
+                            schema:
+                                type: array
+                                items:
+                                    $ref: '#/components/schemas/Media'
+                                xml:
+                                    name: Medias
+                '404':
+                    description: No media found
+                '401':
+                    description: Unauthorized
+    /media/{id}:
+        get:
+            summary: Fetch a specific media by id
+            tags:
+                - Media
+            security:
+                - bearer_auth: []
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+            responses:
+                '200':
+                    description: A specific media
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Media'
+                        application/xml:
+                            schema:
+                                $ref: '#/components/schemas/Media'
+                '401':
+                    description: Unauthorized
+                '404':
+                    description: No media found
+
+components:
+    schemas:
+        Auth:
+            type: object
+            properties:
+                token:
+                    type: string
+                refresh_token:
+                    type: string
+            xml:
+                name: auth
+        Media:
+            type: object
+            properties:
+                id:
+                    type: integer
+                title:
+                    type: string
+                description:
+                    type: string
+                poster:
+                    type: string
+                duration:
+                    type: integer
+                location:
+                    type: string
+                rating:
+                    type: integer
+                language_id:
+                    type: integer
+                genre_id:
+                    type: integer
+                type:
+                    type: string
+            xml:
+                name: Media
+    securitySchemes:
+        bearer_auth:
+            type: http
+            scheme: bearer
+            bearerFormat: JWT
+tags: []
