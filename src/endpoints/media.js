@@ -279,9 +279,10 @@ router.put('/:id', auth_middleware, require_admin, async (req, res) => {
                         update media
                         set ${sql(film, keys)}
                         where id = ${id}
-                        returning id`;
+                        returning 1
+                    `;
         if (update.length === 0) {
-            respond(req, res, { error: 'Film not found' }, null, 404);
+            respond(req, res, { error: 'Media not found' }, null, 404);
             return;
         }
     } catch (error) {
@@ -293,7 +294,7 @@ router.put('/:id', auth_middleware, require_admin, async (req, res) => {
     respond(
         req,
         res,
-        { message: 'Media updated successfully' },
+        { message: 'Media updated successfully', id: id },
         'success',
         200
     );
@@ -311,7 +312,7 @@ router.delete('/:id', auth_middleware, require_admin, async (req, res) => {
         let deleted = await sql`
                         delete from media
                         where id = ${id}
-                        returning id`;
+                        returning 1`;
         if (deleted.length === 0) {
             respond(req, res, { error: 'Media not found' }, null, 404);
             return;
@@ -325,7 +326,7 @@ router.delete('/:id', auth_middleware, require_admin, async (req, res) => {
     respond(
         req,
         res,
-        { message: 'Media deleted successfully' },
+        { message: 'Media deleted successfully', id: id },
         'success',
         200
     );
