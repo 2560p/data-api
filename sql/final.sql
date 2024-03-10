@@ -3,7 +3,7 @@
 --
 
 -- Dumped from database version 16.1 (Debian 16.1-1.pgdg120+1)
--- Dumped by pg_dump version 16.1
+-- Dumped by pg_dump version 16.2 (Homebrew)
 
 -- So you are really looking through .sql files
 -- Wow, impressive
@@ -41,6 +41,10 @@ SET xmloption = content;
 SET client_min_messages = warning;
 SET row_security = off;
 
+--
+-- Roles
+--
+
 CREATE ROLE junior;
 ALTER ROLE junior WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB NOLOGIN NOREPLICATION NOBYPASSRLS;
 
@@ -61,10 +65,11 @@ ALTER ROLE senior_user WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB LOGIN NO
 
 
 --
--- Name: age_classification_enum; Type: TYPE; Schema: public; Owner: postgres
+-- Name: age; Type: TYPE; Schema: public; Owner: postgres
 --
 
-CREATE TYPE public.age_classification_enum AS ENUM (
+CREATE TYPE public.age AS ENUM (
+    '0',
     '6',
     '9',
     '12',
@@ -72,19 +77,44 @@ CREATE TYPE public.age_classification_enum AS ENUM (
 );
 
 
-ALTER TYPE public.age_classification_enum OWNER TO postgres;
+ALTER TYPE public.age OWNER TO postgres;
 
 --
--- Name: new_media_type_enum; Type: TYPE; Schema: public; Owner: postgres
+-- Name: content; Type: TYPE; Schema: public; Owner: postgres
 --
 
-CREATE TYPE public.new_media_type_enum AS ENUM (
-    'FILM',
-    'SERIES'
+CREATE TYPE public.content AS ENUM (
+    'SERIES',
+    'FILM'
 );
 
 
-ALTER TYPE public.new_media_type_enum OWNER TO postgres;
+ALTER TYPE public.content OWNER TO postgres;
+
+--
+-- Name: entity_type; Type: TYPE; Schema: public; Owner: postgres
+--
+
+CREATE TYPE public.entity_type AS ENUM (
+    'ADMIN',
+    'USER'
+);
+
+
+ALTER TYPE public.entity_type OWNER TO postgres;
+
+--
+-- Name: plan; Type: TYPE; Schema: public; Owner: postgres
+--
+
+CREATE TYPE public.plan AS ENUM (
+    'SD',
+    'HD',
+    'UHD'
+);
+
+
+ALTER TYPE public.plan OWNER TO postgres;
 
 --
 -- Name: role_type; Type: TYPE; Schema: public; Owner: postgres
@@ -98,19 +128,6 @@ CREATE TYPE public.role_type AS ENUM (
 
 
 ALTER TYPE public.role_type OWNER TO postgres;
-
---
--- Name: subscription_type_enum; Type: TYPE; Schema: public; Owner: postgres
---
-
-CREATE TYPE public.subscription_type_enum AS ENUM (
-    'SD',
-    'HD',
-    'UHD'
-);
-
-
-ALTER TYPE public.subscription_type_enum OWNER TO postgres;
 
 --
 -- Name: user_status; Type: TYPE; Schema: public; Owner: postgres
@@ -181,31 +198,27 @@ $$;
 ALTER FUNCTION public.admin_retrieve_password_hash(p_email character varying) OWNER TO postgres;
 
 --
--- Name: apply_discount(); Type: FUNCTION; Schema: public; Owner: postgres
+-- Name: check_id_role(); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
-CREATE FUNCTION public.apply_discount() RETURNS trigger
+CREATE FUNCTION public.check_id_role() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
-BEGIN
-    IF NEW.discount_received = true AND OLD.discount_received = false THEN
-        IF NOT EXISTS (
-            SELECT 1
-            FROM subscriptions
-            WHERE user_id IN (NEW.inviter_user_id, NEW.invitee_user_id)
-              AND discount_received = true
-        ) THEN
-            UPDATE subscriptions
-            SET cost_per_month = cost_per_month - 2
-            WHERE user_id IN (NEW.inviter_user_id, NEW.invitee_user_id);
-        END IF;
-    END IF;
-    RETURN NEW;
-END;
+begin
+    if NEW.entity_type = 'ADMIN' and not exists (select 1 from admins WHERE id = NEW.entity_id) then
+        raise exception 'Invalid id for the specified role';
+    end if;
+
+    if NEW.entity_type = 'USER' and not exists (select 1 from users WHERE id = NEW.entity_id) then
+        raise exception 'Invalid id for the specified role';
+    end if;
+
+    return new;
+end;
 $$;
 
 
-ALTER FUNCTION public.apply_discount() OWNER TO postgres;
+ALTER FUNCTION public.check_id_role() OWNER TO postgres;
 
 --
 -- Name: check_profile_limit(); Type: FUNCTION; Schema: public; Owner: postgres
@@ -609,19 +622,24 @@ CREATE PROCEDURE public.update_currently_watched(IN p_profileid integer, IN p_me
     LANGUAGE plpgsql
     AS $$
 BEGIN
-    IF EXISTS (
-        SELECT 1
-        FROM currently_watched
-        WHERE profile_id = p_ProfileID AND media_id = p_MediaID
-    ) THEN
-        UPDATE currently_watched
-        SET progress_seconds = p_ProgressSeconds,
-            last_watched = CURRENT_TIMESTAMP
-        WHERE profile_id = p_ProfileID AND media_id = p_MediaID;
-    ELSE
-        INSERT INTO currently_watched (profile_id, media_id, progress_seconds)
-        VALUES (p_ProfileID, p_MediaID, p_ProgressSeconds);
-    END IF;
+    BEGIN
+        IF EXISTS (
+            SELECT 1
+            FROM currently_watched
+            WHERE profile_id = p_profileid AND media_id = p_mediaid
+        ) THEN
+            UPDATE currently_watched
+            SET progress_seconds = p_progressseconds,
+                last_watched = CURRENT_TIMESTAMP
+            WHERE profile_id = p_profileid AND media_id = p_mediaid;
+        ELSE
+            INSERT INTO currently_watched (profile_id, media_id, progress_seconds)
+            VALUES (p_profileid, p_mediaid, p_progressseconds);
+        END IF;
+    EXCEPTION
+        WHEN others THEN
+            RAISE EXCEPTION 'An error occurred during the update.';
+    END;
 END;
 $$;
 
@@ -629,56 +647,59 @@ $$;
 ALTER PROCEDURE public.update_currently_watched(IN p_profileid integer, IN p_mediaid integer, IN p_progressseconds integer) OWNER TO postgres;
 
 --
--- Name: user_login(character varying, character varying); Type: FUNCTION; Schema: public; Owner: postgres
+-- Name: user_register(character varying, character varying); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
-CREATE FUNCTION public.user_login(p_email character varying, p_password character varying) RETURNS character varying
-    LANGUAGE plpgsql
-    AS $$
-    DECLARE
-        v_user_id INT;
-    BEGIN
-        SELECT id INTO v_user_id
-        FROM users
-        WHERE email = p_email
-        AND password = p_password
-        AND status = 'ACTIVE'::user_status;
-             
-        IF v_user_id IS NOT NULL THEN
-            RETURN 'Login successful. UserID: ' || v_user_id;
-        ELSE
-            RETURN 'Login failed. Invalid email, password, or user status.';
-        END IF;
-    END;
-$$;
-
-
-ALTER FUNCTION public.user_login(p_email character varying, p_password character varying) OWNER TO postgres;
-
---
--- Name: user_register(character varying, character varying, public.user_status); Type: PROCEDURE; Schema: public; Owner: postgres
---
-
-CREATE PROCEDURE public.user_register(IN p_email character varying, IN p_password character varying, IN p_status public.user_status)
+CREATE FUNCTION public.user_register(p_email character varying, p_password character varying) RETURNS record
     LANGUAGE plpgsql
     AS $$
 DECLARE
     v_user_exists BOOLEAN;
+    user_id integer;
+    ret record;
 BEGIN
     SELECT EXISTS (SELECT 1 FROM users WHERE email = p_email) INTO v_user_exists;
 
     IF v_user_exists THEN
-        RAISE EXCEPTION 'Email already exists. Please use a different email.';
+        select -1, 0 into ret;
     ELSE
-        INSERT INTO users (email, password, status)
-        VALUES (p_email, p_password, p_status);
-        RAISE NOTICE 'User added successfully.';
+        INSERT INTO users (email, password)
+        VALUES (p_email, p_password) returning id into user_id;
+        select 1, user_id into ret;
     END IF;
+    return ret;
 END;
 $$;
 
 
-ALTER PROCEDURE public.user_register(IN p_email character varying, IN p_password character varying, IN p_status public.user_status) OWNER TO postgres;
+ALTER FUNCTION public.user_register(p_email character varying, p_password character varying) OWNER TO postgres;
+
+--
+-- Name: user_retrieve_password_hash(character varying); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.user_retrieve_password_hash(p_email character varying) RETURNS record
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_user_exists BOOLEAN;
+    ret record;
+BEGIN
+    SELECT EXISTS (SELECT 1 FROM users WHERE email = p_email) INTO v_user_exists;
+
+    IF v_user_exists THEN
+        select password, id
+        from users
+        where email = p_email into ret;
+    ELSE
+        select -1, 0 into ret;
+    END IF;
+    return ret;
+END;
+$$;
+
+
+ALTER FUNCTION public.user_retrieve_password_hash(p_email character varying) OWNER TO postgres;
 
 SET default_tablespace = '';
 
@@ -721,40 +742,6 @@ ALTER SEQUENCE public.admins_id_seq OWNED BY public.admins.id;
 
 
 --
--- Name: age_restriction; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.age_restriction (
-    id integer NOT NULL,
-    age_classification public.age_classification_enum
-);
-
-
-ALTER TABLE public.age_restriction OWNER TO postgres;
-
---
--- Name: age_restriction_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
---
-
-CREATE SEQUENCE public.age_restriction_id_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
-ALTER SEQUENCE public.age_restriction_id_seq OWNER TO postgres;
-
---
--- Name: age_restriction_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
---
-
-ALTER SEQUENCE public.age_restriction_id_seq OWNED BY public.age_restriction.id;
-
-
---
 -- Name: currently_watched; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -773,10 +760,10 @@ ALTER TABLE public.currently_watched OWNER TO postgres;
 --
 
 CREATE TABLE public.episodes (
-    series_id integer NOT NULL,
+    media_id integer NOT NULL,
     number integer NOT NULL,
     location character varying(256),
-    episodes_name text,
+    name text,
     title text,
     duration integer
 );
@@ -785,11 +772,80 @@ CREATE TABLE public.episodes (
 ALTER TABLE public.episodes OWNER TO postgres;
 
 --
+-- Name: genres; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.genres (
+    id integer NOT NULL,
+    name character varying(256) NOT NULL,
+    age public.age NOT NULL
+);
+
+
+ALTER TABLE public.genres OWNER TO postgres;
+
+--
+-- Name: genre_genre_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.genre_genre_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.genre_genre_id_seq OWNER TO postgres;
+
+--
+-- Name: genre_genre_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.genre_genre_id_seq OWNED BY public.genres.id;
+
+
+--
+-- Name: languages; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.languages (
+    id integer NOT NULL,
+    name character varying(256) NOT NULL
+);
+
+
+ALTER TABLE public.languages OWNER TO postgres;
+
+--
+-- Name: language_language_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.language_language_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.language_language_id_seq OWNER TO postgres;
+
+--
+-- Name: language_language_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.language_language_id_seq OWNED BY public.languages.id;
+
+
+--
 -- Name: liked_media; Type: TABLE; Schema: public; Owner: postgres
 --
 
 CREATE TABLE public.liked_media (
-    user_id integer NOT NULL,
+    profile_id integer NOT NULL,
     media_id integer NOT NULL
 );
 
@@ -803,16 +859,14 @@ ALTER TABLE public.liked_media OWNER TO postgres;
 CREATE TABLE public.media (
     id integer NOT NULL,
     title character varying(256) NOT NULL,
-    genre character varying(50),
-    language character varying(256),
-    media_type public.new_media_type_enum,
     description text,
     poster character varying(256),
     duration integer,
     location character varying(256),
     rating integer,
-    age public.age_classification_enum NOT NULL,
-    likes integer
+    language_id integer,
+    genre_id integer,
+    type public.content NOT NULL
 );
 
 
@@ -841,15 +895,51 @@ ALTER SEQUENCE public.media_id_seq OWNED BY public.media.id;
 
 
 --
+-- Name: media_watch_details; Type: VIEW; Schema: public; Owner: postgres
+--
+
+CREATE VIEW public.media_watch_details AS
+ SELECT m.id,
+    m.title,
+    m.duration,
+    m.rating,
+    l.name AS language,
+    g.name AS genre,
+    m.type
+   FROM ((public.media m
+     JOIN public.languages l ON ((m.language_id = l.id)))
+     JOIN public.genres g ON ((m.genre_id = g.id)))
+  ORDER BY m.rating DESC
+ LIMIT 10;
+
+
+ALTER VIEW public.media_watch_details OWNER TO postgres;
+
+--
+-- Name: most_popular_genre; Type: VIEW; Schema: public; Owner: postgres
+--
+
+CREATE VIEW public.most_popular_genre AS
+ SELECT g.name AS genre,
+    count(*) AS media_count
+   FROM (public.media m
+     JOIN public.genres g ON ((m.genre_id = g.id)))
+  GROUP BY g.name
+  ORDER BY (count(*)) DESC;
+
+
+ALTER VIEW public.most_popular_genre OWNER TO postgres;
+
+--
 -- Name: profiles; Type: TABLE; Schema: public; Owner: postgres
 --
 
 CREATE TABLE public.profiles (
     id integer NOT NULL,
     user_id integer NOT NULL,
-    profile_name character varying(256),
+    name character varying(256),
     birthdate date NOT NULL,
-    profile_photo character varying(256)
+    photo character varying(256)
 );
 
 
@@ -878,45 +968,18 @@ ALTER SEQUENCE public.profiles_id_seq OWNED BY public.profiles.id;
 
 
 --
--- Name: series; Type: TABLE; Schema: public; Owner: postgres
+-- Name: refresh_tokens; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.series (
-    id integer NOT NULL,
-    series_title character varying(256) NOT NULL,
-    description text,
-    poster character varying(256),
-    seasons integer DEFAULT 1 NOT NULL,
-    genre character varying(256),
-    rating integer NOT NULL,
-    media_id integer,
-    age public.age_classification_enum NOT NULL
+CREATE TABLE public.refresh_tokens (
+    entity_id integer NOT NULL,
+    entity_type public.entity_type NOT NULL,
+    token character(32) NOT NULL,
+    expires_at timestamp without time zone NOT NULL
 );
 
 
-ALTER TABLE public.series OWNER TO postgres;
-
---
--- Name: series_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
---
-
-CREATE SEQUENCE public.series_id_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
-ALTER SEQUENCE public.series_id_seq OWNER TO postgres;
-
---
--- Name: series_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
---
-
-ALTER SEQUENCE public.series_id_seq OWNED BY public.series.id;
-
+ALTER TABLE public.refresh_tokens OWNER TO postgres;
 
 --
 -- Name: subscriptions; Type: TABLE; Schema: public; Owner: postgres
@@ -926,15 +989,44 @@ CREATE TABLE public.subscriptions (
     user_id integer,
     start_date date NOT NULL,
     end_date date NOT NULL,
-    subscription_id integer NOT NULL,
+    id integer NOT NULL,
     cost_per_month numeric(8,2) NOT NULL,
-    subscription_type public.subscription_type_enum NOT NULL,
     has_invited integer,
-    invited_by integer
+    invited_by integer,
+    type public.plan NOT NULL
 );
 
 
 ALTER TABLE public.subscriptions OWNER TO postgres;
+
+--
+-- Name: users; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.users (
+    id integer NOT NULL,
+    email character varying(256) NOT NULL,
+    password character varying(256) NOT NULL,
+    status public.user_status DEFAULT 'RESTRICTED'::public.user_status NOT NULL
+);
+
+
+ALTER TABLE public.users OWNER TO postgres;
+
+--
+-- Name: subscription_stats; Type: VIEW; Schema: public; Owner: postgres
+--
+
+CREATE VIEW public.subscription_stats AS
+ SELECT p.type AS plan,
+    count(u.id) AS number_of_users,
+    sum(p.cost_per_month) AS total_expected_cost_per_month
+   FROM (public.subscriptions p
+     JOIN public.users u ON ((p.user_id = u.id)))
+  GROUP BY p.type;
+
+
+ALTER VIEW public.subscription_stats OWNER TO postgres;
 
 --
 -- Name: subscriptions_subscription_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
@@ -955,7 +1047,7 @@ ALTER SEQUENCE public.subscriptions_subscription_id_seq OWNER TO postgres;
 -- Name: subscriptions_subscription_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
 
-ALTER SEQUENCE public.subscriptions_subscription_id_seq OWNED BY public.subscriptions.subscription_id;
+ALTER SEQUENCE public.subscriptions_subscription_id_seq OWNED BY public.subscriptions.id;
 
 
 --
@@ -965,25 +1057,11 @@ ALTER SEQUENCE public.subscriptions_subscription_id_seq OWNED BY public.subscrip
 CREATE TABLE public.subtitles (
     media_id integer NOT NULL,
     url character varying(256) NOT NULL,
-    language character varying(256) NOT NULL
+    language_id integer NOT NULL
 );
 
 
 ALTER TABLE public.subtitles OWNER TO postgres;
-
---
--- Name: users; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.users (
-    id integer NOT NULL,
-    email character varying(256) NOT NULL,
-    password character varying(256) NOT NULL,
-    status public.user_status DEFAULT 'RESTRICTED'::public.user_status NOT NULL
-);
-
-
-ALTER TABLE public.users OWNER TO postgres;
 
 --
 -- Name: users_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
@@ -1028,10 +1106,17 @@ ALTER TABLE ONLY public.admins ALTER COLUMN id SET DEFAULT nextval('public.admin
 
 
 --
--- Name: age_restriction id; Type: DEFAULT; Schema: public; Owner: postgres
+-- Name: genres id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.age_restriction ALTER COLUMN id SET DEFAULT nextval('public.age_restriction_id_seq'::regclass);
+ALTER TABLE ONLY public.genres ALTER COLUMN id SET DEFAULT nextval('public.genre_genre_id_seq'::regclass);
+
+
+--
+-- Name: languages id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.languages ALTER COLUMN id SET DEFAULT nextval('public.language_language_id_seq'::regclass);
 
 
 --
@@ -1049,10 +1134,10 @@ ALTER TABLE ONLY public.profiles ALTER COLUMN id SET DEFAULT nextval('public.pro
 
 
 --
--- Name: subscriptions subscription_id; Type: DEFAULT; Schema: public; Owner: postgres
+-- Name: subscriptions id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.subscriptions ALTER COLUMN subscription_id SET DEFAULT nextval('public.subscriptions_subscription_id_seq'::regclass);
+ALTER TABLE ONLY public.subscriptions ALTER COLUMN id SET DEFAULT nextval('public.subscriptions_subscription_id_seq'::regclass);
 
 
 --
@@ -1071,27 +1156,27 @@ ALTER TABLE ONLY public.admins
 
 
 --
--- Name: age_restriction age_restriction_classification_unique; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.age_restriction
-    ADD CONSTRAINT age_restriction_classification_unique UNIQUE (age_classification);
-
-
---
--- Name: age_restriction age_restriction_pk; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.age_restriction
-    ADD CONSTRAINT age_restriction_pk PRIMARY KEY (id);
-
-
---
 -- Name: episodes episodes_pk; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.episodes
-    ADD CONSTRAINT episodes_pk PRIMARY KEY (series_id, number);
+    ADD CONSTRAINT episodes_pk PRIMARY KEY (media_id, number);
+
+
+--
+-- Name: genres genre_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.genres
+    ADD CONSTRAINT genre_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: languages language_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.languages
+    ADD CONSTRAINT language_pkey PRIMARY KEY (id);
 
 
 --
@@ -1099,7 +1184,7 @@ ALTER TABLE ONLY public.episodes
 --
 
 ALTER TABLE ONLY public.liked_media
-    ADD CONSTRAINT liked_media_pkey PRIMARY KEY (user_id, media_id);
+    ADD CONSTRAINT liked_media_pkey PRIMARY KEY (profile_id, media_id);
 
 
 --
@@ -1119,11 +1204,11 @@ ALTER TABLE ONLY public.profiles
 
 
 --
--- Name: series series_pk; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: refresh_tokens refresh_tokens_pk; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.series
-    ADD CONSTRAINT series_pk PRIMARY KEY (id);
+ALTER TABLE ONLY public.refresh_tokens
+    ADD CONSTRAINT refresh_tokens_pk PRIMARY KEY (entity_id, entity_type);
 
 
 --
@@ -1131,7 +1216,7 @@ ALTER TABLE ONLY public.series
 --
 
 ALTER TABLE ONLY public.subscriptions
-    ADD CONSTRAINT subscriptions_pkey PRIMARY KEY (subscription_id);
+    ADD CONSTRAINT subscriptions_pkey PRIMARY KEY (id);
 
 
 --
@@ -1159,18 +1244,40 @@ ALTER TABLE ONLY public.currently_watched
 
 
 --
+-- Name: refresh_tokens_token_index; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX refresh_tokens_token_index ON public.refresh_tokens USING btree (token);
+
+
+--
 -- Name: profiles check_profile_limit_trigger; Type: TRIGGER; Schema: public; Owner: postgres
 --
 
-CREATE TRIGGER check_profile_limit_trigger BEFORE INSERT OR UPDATE ON public.profiles FOR EACH ROW EXECUTE FUNCTION public.check_profile_limit();
+CREATE TRIGGER check_profile_limit_trigger BEFORE INSERT ON public.profiles FOR EACH ROW EXECUTE FUNCTION public.check_profile_limit();
 
 
 --
--- Name: episodes episodes_series_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+-- Name: refresh_tokens check_refresh_tokens; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER check_refresh_tokens BEFORE INSERT OR UPDATE ON public.refresh_tokens FOR EACH ROW EXECUTE FUNCTION public.check_id_role();
+
+
+--
+-- Name: episodes episodes_media_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.episodes
-    ADD CONSTRAINT episodes_series_id_fk FOREIGN KEY (series_id) REFERENCES public.series(id);
+    ADD CONSTRAINT episodes_media_id_fk FOREIGN KEY (media_id) REFERENCES public.media(id);
+
+
+--
+-- Name: media fk_media_language; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.media
+    ADD CONSTRAINT fk_media_language FOREIGN KEY (language_id) REFERENCES public.languages(id);
 
 
 --
@@ -1182,11 +1289,27 @@ ALTER TABLE ONLY public.liked_media
 
 
 --
--- Name: liked_media liked_media_user_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+-- Name: liked_media liked_media_profile_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.liked_media
-    ADD CONSTRAINT liked_media_user_fk FOREIGN KEY (user_id) REFERENCES public.users(id);
+    ADD CONSTRAINT liked_media_profile_fk FOREIGN KEY (profile_id) REFERENCES public.profiles(id);
+
+
+--
+-- Name: media media_genre_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.media
+    ADD CONSTRAINT media_genre_fk FOREIGN KEY (genre_id) REFERENCES public.genres(id);
+
+
+--
+-- Name: media media_genre_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.media
+    ADD CONSTRAINT media_genre_id_fkey FOREIGN KEY (genre_id) REFERENCES public.genres(id);
 
 
 --
@@ -1198,19 +1321,19 @@ ALTER TABLE ONLY public.profiles
 
 
 --
--- Name: series series_media_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.series
-    ADD CONSTRAINT series_media_id_fk FOREIGN KEY (media_id) REFERENCES public.media(id);
-
-
---
 -- Name: subscriptions subscriptions_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.subscriptions
     ADD CONSTRAINT subscriptions_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id);
+
+
+--
+-- Name: subtitles subtitles_language_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.subtitles
+    ADD CONSTRAINT subtitles_language_id_fkey FOREIGN KEY (language_id) REFERENCES public.languages(id);
 
 
 --
@@ -1268,35 +1391,6 @@ GRANT SELECT,USAGE ON SEQUENCE public.admins_id_seq TO senior;
 
 
 --
--- Name: TABLE age_restriction; Type: ACL; Schema: public; Owner: postgres
---
-
-GRANT ALL ON TABLE public.age_restriction TO senior;
-GRANT ALL ON TABLE public.age_restriction TO medior;
-
-
---
--- Name: COLUMN age_restriction.id; Type: ACL; Schema: public; Owner: postgres
---
-
-GRANT SELECT(id),UPDATE(id) ON TABLE public.age_restriction TO medior;
-
-
---
--- Name: COLUMN age_restriction.age_classification; Type: ACL; Schema: public; Owner: postgres
---
-
-GRANT SELECT(age_classification),UPDATE(age_classification) ON TABLE public.age_restriction TO medior;
-
-
---
--- Name: SEQUENCE age_restriction_id_seq; Type: ACL; Schema: public; Owner: postgres
---
-
-GRANT SELECT,USAGE ON SEQUENCE public.age_restriction_id_seq TO senior;
-
-
---
 -- Name: TABLE currently_watched; Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -1315,11 +1409,11 @@ GRANT SELECT ON TABLE public.episodes TO junior;
 
 
 --
--- Name: COLUMN episodes.series_id; Type: ACL; Schema: public; Owner: postgres
+-- Name: COLUMN episodes.media_id; Type: ACL; Schema: public; Owner: postgres
 --
 
-GRANT SELECT(series_id),UPDATE(series_id) ON TABLE public.episodes TO medior;
-GRANT SELECT(series_id),INSERT(series_id),REFERENCES(series_id) ON TABLE public.episodes TO senior;
+GRANT SELECT(media_id),UPDATE(media_id) ON TABLE public.episodes TO medior;
+GRANT SELECT(media_id),INSERT(media_id),REFERENCES(media_id) ON TABLE public.episodes TO senior;
 
 
 --
@@ -1339,11 +1433,11 @@ GRANT SELECT(location),INSERT(location),REFERENCES(location) ON TABLE public.epi
 
 
 --
--- Name: COLUMN episodes.episodes_name; Type: ACL; Schema: public; Owner: postgres
+-- Name: COLUMN episodes.name; Type: ACL; Schema: public; Owner: postgres
 --
 
-GRANT SELECT(episodes_name),UPDATE(episodes_name) ON TABLE public.episodes TO medior;
-GRANT SELECT(episodes_name),INSERT(episodes_name),REFERENCES(episodes_name) ON TABLE public.episodes TO senior;
+GRANT SELECT(name),UPDATE(name) ON TABLE public.episodes TO medior;
+GRANT SELECT(name),INSERT(name),REFERENCES(name) ON TABLE public.episodes TO senior;
 
 
 --
@@ -1381,6 +1475,24 @@ GRANT ALL ON TABLE public.media TO senior;
 
 
 --
+-- Name: TABLE media_watch_details; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT SELECT ON TABLE public.media_watch_details TO junior;
+GRANT ALL ON TABLE public.media_watch_details TO medior;
+GRANT ALL ON TABLE public.media_watch_details TO senior;
+
+
+--
+-- Name: TABLE most_popular_genre; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT SELECT ON TABLE public.most_popular_genre TO junior;
+GRANT ALL ON TABLE public.most_popular_genre TO medior;
+GRANT ALL ON TABLE public.most_popular_genre TO senior;
+
+
+--
 -- Name: TABLE profiles; Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -1397,26 +1509,25 @@ GRANT SELECT,USAGE ON SEQUENCE public.profiles_id_seq TO junior;
 
 
 --
--- Name: TABLE series; Type: ACL; Schema: public; Owner: postgres
---
-
-GRANT ALL ON TABLE public.series TO senior;
-GRANT ALL ON TABLE public.series TO medior;
-GRANT SELECT ON TABLE public.series TO junior;
-
-
---
--- Name: SEQUENCE series_id_seq; Type: ACL; Schema: public; Owner: postgres
---
-
-GRANT SELECT,USAGE ON SEQUENCE public.series_id_seq TO senior;
-
-
---
 -- Name: TABLE subscriptions; Type: ACL; Schema: public; Owner: postgres
 --
 
 GRANT ALL ON TABLE public.subscriptions TO senior;
+
+
+--
+-- Name: TABLE users; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON TABLE public.users TO senior;
+GRANT ALL ON TABLE public.users TO medior;
+
+
+--
+-- Name: TABLE subscription_stats; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON TABLE public.subscription_stats TO senior;
 
 
 --
@@ -1440,21 +1551,6 @@ GRANT SELECT(media_id) ON TABLE public.subtitles TO junior;
 --
 
 GRANT SELECT(url) ON TABLE public.subtitles TO junior;
-
-
---
--- Name: COLUMN subtitles.language; Type: ACL; Schema: public; Owner: postgres
---
-
-GRANT SELECT(language) ON TABLE public.subtitles TO junior;
-
-
---
--- Name: TABLE users; Type: ACL; Schema: public; Owner: postgres
---
-
-GRANT ALL ON TABLE public.users TO senior;
-GRANT ALL ON TABLE public.users TO medior;
 
 
 --
@@ -1498,212 +1594,6 @@ GRANT ALL(media_id) ON TABLE public.watch_history TO senior;
 GRANT SELECT(date) ON TABLE public.watch_history TO junior;
 GRANT SELECT(date),UPDATE(date) ON TABLE public.watch_history TO medior;
 GRANT ALL(date) ON TABLE public.watch_history TO senior;
-
-
---
--- PostgreSQL database dump complete
---
-
---
--- Data time
---
-
---
--- Data for Name: admins; Type: TABLE DATA; Schema: public; Owner: postgres
---
-
-COPY public.admins (id, role, email, password) FROM stdin;
-\.
-
-
---
--- Data for Name: age_restriction; Type: TABLE DATA; Schema: public; Owner: postgres
---
-
-COPY public.age_restriction (id, age_classification) FROM stdin;
-1	6
-2	9
-3	12
-4	16
-\.
-
-
---
--- Data for Name: media; Type: TABLE DATA; Schema: public; Owner: postgres
---
-
-COPY public.media (id, title, genre, language, media_type, description, poster, duration, location, rating, age, likes) FROM stdin;
-3	Pulp Fiction	action	en	FILM	The lives of two mob hitmen, a boxer, a gangster and his wife, and a pair of diner bandits intertwine in four tales of violence and redemption.\n	https://m.media-amazon.com/images/M/MV5BNGNhMDIzZTUtNTBlZi00MTRlLWFjM2ItYzViMjE3YzI5MjljXkEyXkFqcGdeQXVyNzkwMjQ5NzM@._V1_FMjpg_UX1000_.jpg	121	America	8	16	0
-2	Hacksaw Ridge	war	en	FILM	One of the greatest hero's in American history never fired a bullet	https://m.media-amazon.com/images/M/MV5BMjQ1NjM3MTUxNV5BMl5BanBnXkFtZTgwMDc5MTY5OTE@._V1_FMjpg_UX1000_.jpg	137	America	7	16	1
-4	Breaking Bad	crime	en	SERIES	Breaking Bad follows Walter White, a struggling, frustrated high school chemistry teacher who transforms into a ruthless kingpin in the local methamphetamine drug trade, driven to provide for his family financially after being diagnosed with inoperable lung cancer.	https://fhm.nl/wp-content/uploads/2017/03/FHM-BreakingBad.jpg	251	America	10	16	1
-\.
-
-
---
--- Data for Name: users; Type: TABLE DATA; Schema: public; Owner: postgres
---
-
-COPY public.users (id, email, password, status) FROM stdin;
-4	marijn.veenstra1@student.nhlstenden.com	03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4	ACTIVE
-5	anastasia.lukanova@student.nhlstenden.com	5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8	RESTRICTED
-6	paul.demenko@student.nhlstenden.com	b9c950640e1b3740e98acb93e669c65766f6670dd1609ba91ff41052ba48c6f3	ACTIVE
-7	gabriel.guevara.lopez@student.nhlstenden.com	13004d8331d779808a2336d46b3553d1594229e2bb696a8e9e14554d82a648da	BLOCKED
-\.
-
-
---
--- Data for Name: profiles; Type: TABLE DATA; Schema: public; Owner: postgres
---
-
-COPY public.profiles (id, user_id, profile_name, birthdate, profile_photo) FROM stdin;
-4	4	Marijn	2003-03-27	\N
-5	4	Bob	1993-01-07	\N
-6	4	Hank	1983-01-08	\N
-7	5	Amy	2000-06-21	\N
-\.
-
-
---
--- Data for Name: currently_watched; Type: TABLE DATA; Schema: public; Owner: postgres
---
-
-COPY public.currently_watched (profile_id, media_id, progress_seconds, last_watched) FROM stdin;
-4	2	531	2024-01-21 22:27:20.11078
-\.
-
-
---
--- Data for Name: series; Type: TABLE DATA; Schema: public; Owner: postgres
---
-
-COPY public.series (id, series_title, description, poster, seasons, genre, rating, media_id, age) FROM stdin;
-1	Breaking Bad	Breaking Bad follows Walter White, a struggling, frustrated high school chemistry teacher who transforms into a ruthless kingpin in the local methamphetamine drug trade, driven to provide for his family financially after being diagnosed with inoperable lung cancer.\n	https://fhm.nl/wp-content/uploads/2017/03/FHM-BreakingBad.jpg	6	crime	10	4	16
-\.
-
-
---
--- Data for Name: episodes; Type: TABLE DATA; Schema: public; Owner: postgres
---
-
-COPY public.episodes (series_id, number, location, episodes_name, title, duration) FROM stdin;
-1	1	America	Pilot	Breaking Bad	93
-1	2	America	Cat's in the Bag...	Breaking Bad	48
-1	3	America	...And the Bag's in the River	Breaking Bad	43
-\.
-
-
---
--- Data for Name: genres; Type: TABLE DATA; Schema: public; Owner: postgres
---
-
-COPY public.genres (id, name) FROM stdin;
-1	history
-2	fantasy
-3	sci-fi
-4	war
-5	crime
-6	horror
-7	comedy
-8	action
-\.
-
-
---
--- Data for Name: liked_media; Type: TABLE DATA; Schema: public; Owner: postgres
---
-
-COPY public.liked_media (user_id, media_id) FROM stdin;
-4	2
-4	4
-\.
-
-
---
--- Data for Name: subscriptions; Type: TABLE DATA; Schema: public; Owner: postgres
---
-
-COPY public.subscriptions (user_id, start_date, end_date, subscription_id, cost_per_month, subscription_type, has_invited, invited_by) FROM stdin;
-4	2024-01-05	2024-02-05	1	13.99	UHD	\N	\N
-5	2024-01-11	2024-02-11	2	10.99	HD	\N	\N
-6	2024-01-15	2024-02-15	3	7.99	SD	\N	\N
-7	2024-01-06	2024-02-06	4	10.99	HD	\N	\N
-\.
-
-
---
--- Data for Name: subtitles; Type: TABLE DATA; Schema: public; Owner: postgres
---
-
-COPY public.subtitles (media_id, url, language) FROM stdin;
-2	https://www.subtitles.com/hacksawridge	en
-3	https://www.subtitles.com/pulpfiction	en
-4	https://www.subtitles.com/breakingbad	en
-\.
-
-
---
--- Data for Name: watch_history; Type: TABLE DATA; Schema: public; Owner: postgres
---
-
-COPY public.watch_history (profile_id, media_id, date) FROM stdin;
-4	2	2024-01-03
-\.
-
-
---
--- Name: admins_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
---
-
-SELECT pg_catalog.setval('public.admins_id_seq', 1, false);
-
-
---
--- Name: age_restriction_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
---
-
-SELECT pg_catalog.setval('public.age_restriction_id_seq', 4, true);
-
-
---
--- Name: media_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
---
-
-SELECT pg_catalog.setval('public.media_id_seq', 4, true);
-
-
---
--- Name: profiles_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
---
-
-SELECT pg_catalog.setval('public.profiles_id_seq', 7, true);
-
-
---
--- Name: series_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
---
-
-SELECT pg_catalog.setval('public.series_id_seq', 1, false);
-
-
---
--- Name: subscriptions_subscription_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
---
-
-SELECT pg_catalog.setval('public.subscriptions_subscription_id_seq', 4, true);
-
-
---
--- Name: table_name_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
---
-
-SELECT pg_catalog.setval('public.table_name_id_seq', 8, true);
-
-
---
--- Name: users_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
---
-
-SELECT pg_catalog.setval('public.users_id_seq', 7, true);
 
 
 --
