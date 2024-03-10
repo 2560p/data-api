@@ -179,4 +179,29 @@ router.delete('/:id', auth_middleware, require_admin, async (req, res) => {
     );
 });
 
+// currently_watched requests
+
+// get request
+router.get('/:id/currently_watched', auth_middleware, async (req, res) => {
+    let id = parseInt(req.params.id);
+
+    if (!Number.isInteger(id)) {
+        respond(req, res, { error: 'Invalid id' }, null, 400);
+        return;
+    }
+
+    let currently_watched = await sql`select 
+                    media_id, progress_seconds, last_watched 
+                    from currently_watched
+                    where profile_id = ${id}
+                    `;
+
+    if (currently_watched.length === 0) {
+        respond(req, res, { error: 'No currently_watched found' }, null, 404);
+        return;
+    }
+
+    respond(req, res, currently_watched, 'media');
+});
+
 export default router;
