@@ -37,6 +37,12 @@ router.post('/register', async (req, res) => {
         return;
     }
 
+    // validate role
+    if (!['senior', 'medior', 'junior'].includes(body.role)) {
+        respond(req, res, { error: 'Invalid role' }, null, 400);
+        return;
+    }
+
     let email = body.email;
     let password = body.password;
     let role = body.role;
