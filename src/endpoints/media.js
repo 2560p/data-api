@@ -291,7 +291,39 @@ router.put('/:id', auth_middleware, require_admin, async (req, res) => {
         res,
         { message: 'Media updated successfully' },
         'success',
-        201
+        200
+    );
+});
+
+// delete request
+router.delete('/:id', auth_middleware, require_admin, async (req, res) => {
+    let id = parseInt(req.params.id);
+    if (!Number.isInteger(id)) {
+        respond(req, res, { error: 'Invalid id' }, null, 400);
+        return;
+    }
+
+    try {
+        let deleted = await sql`
+                        delete from media
+                        where id = ${id}
+                        returning id`;
+        if (deleted.length === 0) {
+            respond(req, res, { error: 'Media not found' }, null, 404);
+            return;
+        }
+    } catch (error) {
+        console.error(error);
+        respond(req, res, { error: 'Internal Server Error' }, null, 500);
+        return;
+    }
+
+    respond(
+        req,
+        res,
+        { message: 'Media deleted successfully' },
+        'success',
+        200
     );
 });
 
