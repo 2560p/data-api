@@ -17,24 +17,6 @@ router.get('/', auth_middleware, async (req, res) => {
     respond(req, res, media, 'media');
 });
 
-router.get('/:id', auth_middleware, async (req, res) => {
-    let id = parseInt(req.params.id);
-
-    if (!Number.isInteger(id)) {
-        respond(req, res, { error: 'Invalid id' }, null, 400);
-        return;
-    }
-
-    let media = await sql`select * from media where id = ${id}`;
-
-    if (media.length === 0) {
-        respond(req, res, { error: 'No media found' }, null, 404);
-        return;
-    }
-
-    respond(req, res, media[0], 'media');
-});
-
 router.get('/films', auth_middleware, async (req, res) => {
     let films = await sql`select * from media where type = 'FILM'`;
 
@@ -330,6 +312,26 @@ router.delete('/:id', auth_middleware, require_admin, async (req, res) => {
         'success',
         200
     );
+});
+
+// get by id
+// it is here because it catches everything that is not caught by the other get requests
+router.get('/:id', auth_middleware, async (req, res) => {
+    let id = parseInt(req.params.id);
+
+    if (!Number.isInteger(id)) {
+        respond(req, res, { error: 'Invalid id' }, null, 400);
+        return;
+    }
+
+    let media = await sql`select * from media where id = ${id}`;
+
+    if (media.length === 0) {
+        respond(req, res, { error: 'No media found' }, null, 404);
+        return;
+    }
+
+    respond(req, res, media[0], 'media');
 });
 
 export default router;
