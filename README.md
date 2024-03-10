@@ -69,3 +69,7 @@ pg_restore backups/2024-01-01.dump -d netflix_api --disable-triggers --clean --s
 ### Advice
 
 The group advises to create backups every day and keep the old backups for 1 month.
+
+## Testing
+
+Testing has been incorporated in Postman requests. You can find the collection under `docs/`.
