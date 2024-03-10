@@ -11,7 +11,7 @@ export function auth_middleware(req, res, next) {
     }
 
     if (!verifyAccessToken(token)) {
-        respond(req, res, { error: 'Invalid auth token' }, null, 403);
+        respond(req, res, { error: 'Unauthorized' }, null, 403);
         return;
     }
 

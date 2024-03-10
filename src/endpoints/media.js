@@ -8,46 +8,52 @@ const router = Router();
 // get requests
 router.get('/', auth_middleware, async (req, res) => {
     let media = await sql`select * from media`;
+
     if (media.length === 0) {
         respond(req, res, { error: 'No media found' }, null, 404);
+        return;
     }
+
     respond(req, res, media, 'media');
 });
 
 router.get('/:id', auth_middleware, async (req, res) => {
-    try {
-        const mediaId = parseInt(req.params.id);
+    let id = parseInt(req.params.id);
 
-        if (Number.isInteger(mediaId)) {
-            let media = await sql`select * from media where id = ${mediaId}`;
-
-            if (media.length === 0) {
-                respond(req, res, { error: 'Media not found' }, null, 404);
-            } else {
-                respond(req, res, media[0], 'media');
-            }
-        } else {
-            respond(req, res, { error: 'Invalid ID' }, null, 400);
-        }
-    } catch (error) {
-        console.error(error);
-        respond(req, res, { error: 'Internal Server Error' }, null, 500);
+    if (!Number.isInteger(id)) {
+        respond(req, res, { error: 'Invalid id' }, null, 400);
+        return;
     }
+
+    let media = await sql`select * from media where id = ${id}`;
+
+    if (media.length === 0) {
+        respond(req, res, { error: 'No media found' }, null, 404);
+        return;
+    }
+
+    respond(req, res, media[0], 'media');
 });
 
 router.get('/films', auth_middleware, async (req, res) => {
     let films = await sql`select * from media where type = 'FILM'`;
+
     if (films.length === 0) {
         respond(req, res, { error: 'No films found' }, null, 404);
+        return;
     }
+
     respond(req, res, films);
 });
 
 router.get('/series', auth_middleware, async (req, res) => {
     let series = await sql`select * from media where type = 'SERIES'`;
+
     if (series.length === 0) {
         respond(req, res, { error: 'No series found' }, null, 404);
+        return;
     }
+
     respond(req, res, series);
 });
 
@@ -233,10 +239,8 @@ router.put('/:id', auth_middleware, require_admin, async (req, res) => {
         genre_id: body.genre_id,
     };
 
-    // create a list of all the defined keys in the film object
     let keys = Object.keys(film).filter((key) => film[key] !== undefined);
 
-    // if duration, rating, language_id or genre_id are defined and are not numbers, return an error
     if (
         (keys.includes('duration') && isNaN(film.duration)) ||
         (keys.includes('rating') && isNaN(film.rating)) ||
