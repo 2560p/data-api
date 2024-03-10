@@ -1271,7 +1271,7 @@ CREATE TRIGGER check_refresh_tokens BEFORE INSERT OR UPDATE ON public.refresh_to
 --
 
 ALTER TABLE ONLY public.episodes
-    ADD CONSTRAINT episodes_media_id_fk FOREIGN KEY (media_id) REFERENCES public.media(id);
+    ADD CONSTRAINT episodes_media_id_fk FOREIGN KEY (media_id) REFERENCES public.media(id) ON UPDATE CASCADE ON DELETE CASCADE;
 
 
 --
@@ -1287,7 +1287,7 @@ ALTER TABLE ONLY public.media
 --
 
 ALTER TABLE ONLY public.liked_media
-    ADD CONSTRAINT liked_media_media_fk FOREIGN KEY (media_id) REFERENCES public.media(id);
+    ADD CONSTRAINT liked_media_media_fk FOREIGN KEY (media_id) REFERENCES public.media(id) ON UPDATE CASCADE ON DELETE CASCADE;
 
 
 --
@@ -1295,7 +1295,7 @@ ALTER TABLE ONLY public.liked_media
 --
 
 ALTER TABLE ONLY public.liked_media
-    ADD CONSTRAINT liked_media_profile_fk FOREIGN KEY (profile_id) REFERENCES public.profiles(id);
+    ADD CONSTRAINT liked_media_profile_fk FOREIGN KEY (profile_id) REFERENCES public.profiles(id) ON UPDATE CASCADE ON DELETE CASCADE;
 
 
 --
@@ -1327,7 +1327,7 @@ ALTER TABLE ONLY public.profiles
 --
 
 ALTER TABLE ONLY public.subscriptions
-    ADD CONSTRAINT subscriptions_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id);
+    ADD CONSTRAINT subscriptions_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON UPDATE CASCADE ON DELETE CASCADE;
 
 
 --
@@ -1343,7 +1343,7 @@ ALTER TABLE ONLY public.subtitles
 --
 
 ALTER TABLE ONLY public.subtitles
-    ADD CONSTRAINT subtitles_media_id_fkey FOREIGN KEY (media_id) REFERENCES public.media(id);
+    ADD CONSTRAINT subtitles_media_id_fkey FOREIGN KEY (media_id) REFERENCES public.media(id) ON UPDATE CASCADE ON DELETE CASCADE;
 
 
 --
@@ -1351,7 +1351,7 @@ ALTER TABLE ONLY public.subtitles
 --
 
 ALTER TABLE ONLY public.watch_history
-    ADD CONSTRAINT watch_history_media_id_fk FOREIGN KEY (media_id) REFERENCES public.media(id);
+    ADD CONSTRAINT watch_history_media_id_fk FOREIGN KEY (media_id) REFERENCES public.media(id) ON UPDATE CASCADE ON DELETE CASCADE;
 
 
 --
@@ -1359,7 +1359,7 @@ ALTER TABLE ONLY public.watch_history
 --
 
 ALTER TABLE ONLY public.watch_history
-    ADD CONSTRAINT watch_history_profiles_id_fk FOREIGN KEY (profile_id) REFERENCES public.profiles(id);
+    ADD CONSTRAINT watch_history_profiles_id_fk FOREIGN KEY (profile_id) REFERENCES public.profiles(id) ON UPDATE CASCADE ON DELETE CASCADE;
 
 
 --
@@ -1367,7 +1367,7 @@ ALTER TABLE ONLY public.watch_history
 --
 
 ALTER TABLE ONLY public.currently_watched
-    ADD CONSTRAINT watch_progress_media_fk FOREIGN KEY (media_id) REFERENCES public.media(id);
+    ADD CONSTRAINT watch_progress_media_fk FOREIGN KEY (media_id) REFERENCES public.media(id) ON UPDATE CASCADE ON DELETE CASCADE;
 
 
 --
@@ -1375,7 +1375,7 @@ ALTER TABLE ONLY public.currently_watched
 --
 
 ALTER TABLE ONLY public.currently_watched
-    ADD CONSTRAINT watch_progress_user_fk FOREIGN KEY (profile_id) REFERENCES public.profiles(id);
+    ADD CONSTRAINT watch_progress_user_fk FOREIGN KEY (profile_id) REFERENCES public.profiles(id) ON UPDATE CASCADE ON DELETE CASCADE;
 
 
 --
